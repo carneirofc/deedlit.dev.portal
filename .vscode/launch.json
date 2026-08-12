@@ -7,7 +7,7 @@
 		
 		{
 			"type": "node-terminal",
-			"name": "Run Script: dev (deedlit.dev)",
+			"name": "Run Script: dev (deedlit.dev.portal)",
 			"request": "launch",
 			"command": "npm run dev",
 			"cwd": "${workspaceFolder}"

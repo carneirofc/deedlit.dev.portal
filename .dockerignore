@@ -44,9 +44,6 @@ README.md
 docs/
 *.md
 
-# Scripts
-scripts/
-
 # Logs
 logs/
 *.log
@@ -54,4 +51,3 @@ logs/
 # Misc
 .editorconfig
 .eslintrc.json
-tsconfig.json

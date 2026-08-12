@@ -37,5 +37,4 @@ This package is the public-facing Next.js site for deedlit.dev. It handles the l
 - Playwright examples: `npm run playwright-examples`
 
 ## Change Boundaries
-- Do not edit monorepo root scripts when a package-local script change is sufficient.
-- Do not place shared UI primitives in this app if both apps would consume them.
+- Do not vendor shared UI primitives into this app — promote them into `deedlit.dev.ui` (in the `deedlit.dev` monorepo) instead.

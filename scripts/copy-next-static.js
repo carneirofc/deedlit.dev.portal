@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const projectRoot = path.resolve(__dirname, "..");
-const standaloneRoot = path.join(projectRoot, ".next", "standalone", "deedlit.dev");
+const standaloneRoot = path.join(projectRoot, ".next", "standalone");
 const staticSourceDir = path.join(projectRoot, ".next", "static");
 const staticTargetDir = path.join(standaloneRoot, ".next", "static");
 const publicSourceDir = path.join(projectRoot, "public");

@@ -1,13 +1,12 @@
 {
-  "name": "deedlit.dev",
+  "name": "deedlit.dev.portal",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build:ui": "npm run build --prefix ../deedlit.dev.ui",
     "dev": "next dev -p 3001",
-    "build": "npm run build:ui && next build",
+    "build": "next build",
     "postbuild": "node scripts/copy-next-static.js",
-    "start": "cross-env PORT=3001 node .next/standalone/deedlit.dev/server.js",
+    "start": "cross-env PORT=3001 node .next/standalone/server.js",
     "lint": "biome lint .",
     "lint:fix": "biome lint . --write",
     "scrape-goodreads": "tsx scripts/scrape-goodreads.ts",
@@ -15,7 +14,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@carneirofc/ui": "file:../deedlit.dev.ui",
+    "@carneirofc/ui": "^1.2.0",
     "clsx": "^2.1.1",
     "next": "^16.3.0",
     "next-auth": "^5.0.0-beta.32",
