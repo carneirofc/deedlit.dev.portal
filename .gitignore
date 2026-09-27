@@ -13,3 +13,6 @@ playwright-report/index.html
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local working notes (security review plans)
+docs/plans/

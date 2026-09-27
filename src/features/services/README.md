@@ -150,8 +150,10 @@ the portal.* Three things narrow what that principal can do:
 
 If anyone other than the operator can create Ingresses (CI tokens, shared
 namespaces, operators generating Ingresses), restrict discovery to a namespace
-allow-list with per-namespace `Role`s — tracked in
-`docs/plans/portal-review/06-ingress-trust-boundary.md`.
+allow-list: a `PORTAL_DISCOVERY_NAMESPACES` setting that fails closed when
+unset, one namespaced list call per entry, and per-namespace `Role`s in
+`deedlit.dev.infra` in place of the ClusterRole, so the token cannot read
+Ingresses anywhere else.
 
 ## Security notes
 
