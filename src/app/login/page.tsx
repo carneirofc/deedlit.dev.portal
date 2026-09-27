@@ -4,6 +4,7 @@ import { FiGithub, FiShield } from "react-icons/fi";
 import { OutlineButton, PageHeader, StatusBanner, SurfacePanel } from "@carneirofc/ui";
 import { auth, signIn, signInProviders } from "@/auth";
 import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { safeCallbackUrl } from "@/lib/safe-redirect";
 
 /**
  * Sign-in is unauthenticated, so it is keyed on the client address rather than
@@ -24,23 +25,6 @@ export const metadata: Metadata = {
  * the org/team check then turned them away — without a distinct message that
  * looks like a broken login rather than a deliberate refusal.
  */
-/**
- * `callbackUrl` arrives in the query string, so it is attacker-controlled: a
- * link to `/login?callbackUrl=https://evil.example` would otherwise bounce an
- * already-signed-in user straight off the origin, with the portal's own
- * hostname lending the hop credibility.
- *
- * Only a site-relative path is ever honoured. `//evil.example` and
- * `/\evil.example` are rejected too — browsers read both as protocol-relative
- * URLs, so a leading-slash test alone is not enough.
- */
-function safeCallbackUrl(raw: string | undefined): string {
-  if (!raw) return "/portal";
-  if (!raw.startsWith("/")) return "/portal";
-  if (raw.startsWith("//") || raw.startsWith("/\\")) return "/portal";
-  return raw;
-}
-
 function errorMessage(code: string | undefined): string | null {
   if (!code) return null;
 
@@ -62,6 +46,7 @@ export default async function LoginPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string }>;
 }) {
   const { callbackUrl, error } = await searchParams;
+  // Attacker-controlled; never pass the raw value on — see `safe-redirect.ts`.
   const destination = safeCallbackUrl(callbackUrl);
 
   const session = await auth();

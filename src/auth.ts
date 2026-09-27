@@ -21,6 +21,7 @@ import {
   oidcUsername
 } from "@/lib/auth/oidc";
 import { logger } from "@/lib/logger";
+import { safeAuthRedirect } from "@/lib/safe-redirect";
 
 /**
  * Authentication for the private `/portal` area.
@@ -193,6 +194,12 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
     error: "/login"
   },
   callbacks: {
+    // Every redirect Auth.js performs goes through the same same-origin rule
+    // `/login` applies to `callbackUrl`, rather than the library default.
+    redirect({ url, baseUrl }) {
+      return safeAuthRedirect(url, baseUrl);
+    },
+
     async signIn({ account, profile }) {
       if (!hasUsableSecret()) return false;
 
