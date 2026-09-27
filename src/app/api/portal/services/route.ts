@@ -34,11 +34,23 @@ export async function GET() {
     );
   }
 
-  const { apps, health, collectedAt } = await getPortalSnapshot();
+  const { apps, health, collectedAt, degraded } = await getPortalSnapshot();
+
+  // Discovery is failing and there is nothing earlier to fall back on: an
+  // empty list with 200 would be indistinguishable from an empty cluster.
+  // Only the failure enum is exposed — never apiserver detail.
+  if (degraded && !degraded.servingLastGood) {
+    return NextResponse.json(
+      { error: "Service discovery unavailable", degraded: { reason: degraded.reason, since: degraded.since } },
+      { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "5" } }
+    );
+  }
 
   return NextResponse.json(
     {
       collectedAt,
+      // Present when this is a previous good snapshot served during a failure.
+      ...(degraded ? { degraded: { reason: degraded.reason, since: degraded.since } } : {}),
       services: apps.map((app) => ({
         id: app.id,
         name: app.name,

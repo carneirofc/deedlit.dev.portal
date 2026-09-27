@@ -6,6 +6,7 @@ import {
   PORTAL_EXPOSE_LABEL,
   SERVICE_CATEGORIES,
   SERVICE_ICONS,
+  type DiscoveryFailure,
   type LocalServiceApp,
   type ServiceCategory,
   type ServiceIcon
@@ -35,7 +36,16 @@ import { localServiceApps } from "@/features/services/data/local-services";
 const SA_DIR = "/var/run/secrets/kubernetes.io/serviceaccount";
 const TOKEN_PATH = `${SA_DIR}/token`;
 const CA_PATH = `${SA_DIR}/ca.crt`;
+/** Socket-idle timeout: no bytes for this long and the request is abandoned. */
 const API_TIMEOUT_MS = 5_000;
+
+/**
+ * Hard ceiling on one apiserver exchange, from dialling to the last byte. The
+ * idle timeout alone is not a deadline — a peer trickling a byte every few
+ * seconds would keep a request, and every portal reader waiting on it, alive
+ * indefinitely.
+ */
+export const API_DEADLINE_MS = 6_000;
 
 /**
  * Nothing the portal reads is large — a few dozen Ingresses is under 200 KB.
@@ -115,13 +125,41 @@ function isIpLiteral(hostname: string): boolean {
   return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":");
 }
 
-function getJson(
+/**
+ * Settles exactly once, always, within `API_DEADLINE_MS`.
+ *
+ * Once a response has started, a peer reset or a mid-body close is reported
+ * on the *response* stream — sometimes as `error`, sometimes only as `aborted`
+ * or a `close` without `end`. Unhandled, the first crashes the process and the
+ * others leave the promise pending forever, which wedges the portal snapshot
+ * that waits on it. Every one of those paths funnels into `fail` here.
+ */
+export function getJson(
   url: string,
-  { token, ca }: { token: string; ca: string }
+  { token, ca }: { token: string; ca: string },
+  { deadlineMs = API_DEADLINE_MS }: { deadlineMs?: number } = {}
 ): Promise<{ status: number; body: string }> {
   const target = new URL(url);
 
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const done = (settle: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      settle();
+    };
+    const fail = (error: Error) =>
+      done(() => {
+        req.destroy();
+        reject(error);
+      });
+
+    const deadline = setTimeout(
+      () => fail(new Error(`No complete response within ${deadlineMs}ms`)),
+      deadlineMs
+    );
+
     const req = httpsRequest(
       {
         hostname: target.hostname,
@@ -141,23 +179,34 @@ function getJson(
         timeout: API_TIMEOUT_MS
       },
       (res) => {
-        let body = "";
+        // Buffers, not strings: a multi-byte character split across chunks
+        // stays intact, and the byte count is exact.
+        const chunks: Buffer[] = [];
         let bytes = 0;
-        res.setEncoding("utf8");
-        res.on("data", (chunk: string) => {
-          bytes += Buffer.byteLength(chunk, "utf8");
+
+        res.on("data", (chunk: Buffer) => {
+          bytes += chunk.length;
           if (bytes > MAX_RESPONSE_BYTES) {
-            req.destroy(new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`));
+            fail(new Error(`Response exceeded ${MAX_RESPONSE_BYTES} bytes`));
             return;
           }
-          body += chunk;
+          chunks.push(chunk);
         });
-        res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+        res.on("error", fail);
+        res.on("aborted", () => fail(new Error("Response aborted")));
+        res.on("close", () => {
+          if (!res.complete) fail(new Error("Response closed before it completed"));
+        });
+        res.on("end", () =>
+          done(() =>
+            resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") })
+          )
+        );
       }
     );
 
-    req.on("timeout", () => req.destroy(new Error(`Timed out after ${API_TIMEOUT_MS}ms`)));
-    req.on("error", reject);
+    req.on("timeout", () => fail(new Error(`Idle for ${API_TIMEOUT_MS}ms`)));
+    req.on("error", fail);
     req.end();
   });
 }
@@ -351,47 +400,73 @@ function toServiceApp(
   };
 }
 
+export type DiscoveryResult =
+  | { ok: true; apps: LocalServiceApp[]; source: "cluster" | "static" }
+  | { ok: false; reason: DiscoveryFailure };
+
+function failureForStatus(status: number): DiscoveryFailure {
+  if (status === 401) return "unauthenticated";
+  if (status === 403) return "rbac";
+  return "unreachable";
+}
+
 /**
- * Returns every portal-exposed service. Outside the cluster (local `next dev`)
- * there is no ServiceAccount token, so the static list is used instead and the
- * feature stays developable on a laptop.
+ * Returns every portal-exposed service, or says why it could not.
+ *
+ * Failure is explicit rather than an empty list: an RBAC regression or an
+ * expired token must not look like "nothing is labelled", because the natural
+ * "fix" for that is to grant more — the opposite of the real cause.
+ *
+ * Outside the cluster (local `next dev`) there is no ServiceAccount token, so
+ * the static list is used instead and the feature stays developable on a
+ * laptop.
  */
-export async function discoverServices(): Promise<LocalServiceApp[]> {
+export async function discoverServices(): Promise<DiscoveryResult> {
   const credentials = await readClusterCredentials();
   if (!credentials) {
     logger.debug("No Kubernetes ServiceAccount token; using the static service list");
-    return [...localServiceApps].sort(byOrderThenName);
+    return { ok: true, apps: [...localServiceApps].sort(byOrderThenName), source: "static" };
   }
 
   const selector = encodeURIComponent(`${PORTAL_EXPOSE_LABEL}=true`);
   const ingressUrl = `${API_HOST}/apis/networking.k8s.io/v1/ingresses?labelSelector=${selector}`;
 
+  let ingressResponse: { status: number; body: string };
   try {
-    const ingressResponse = await getJson(ingressUrl, credentials);
-
-    if (ingressResponse.status < 200 || ingressResponse.status >= 300) {
-      logger.error("Kubernetes ingress discovery failed", { status: ingressResponse.status });
-      return [];
-    }
-
-    const body = JSON.parse(ingressResponse.body) as IngressListResponse;
-
-    // A failure in here is not fatal: without it, named-port backends simply
-    // get no probe URL and render as "unknown" rather than the page failing.
-    const portLookup = await resolveNamedPorts(namedPortBackends(body), credentials);
-
-    const services = (body.items ?? [])
-      .map((item) => toServiceApp(item, portLookup))
-      .filter((service): service is LocalServiceApp => service !== null);
-
-    logger.info(`Discovered ${services.length} portal services from Kubernetes`);
-    return services.sort(byOrderThenName);
+    ingressResponse = await getJson(ingressUrl, credentials);
   } catch (error) {
     logger.error("Kubernetes ingress discovery threw", {
       reason: error instanceof Error ? error.message : "unknown error"
     });
-    return [];
+    return { ok: false, reason: "unreachable" };
   }
+
+  if (ingressResponse.status < 200 || ingressResponse.status >= 300) {
+    const reason = failureForStatus(ingressResponse.status);
+    logger.error("Kubernetes ingress discovery failed", { status: ingressResponse.status, reason });
+    return { ok: false, reason };
+  }
+
+  let body: IngressListResponse;
+  try {
+    body = JSON.parse(ingressResponse.body) as IngressListResponse;
+  } catch (error) {
+    logger.error("Kubernetes ingress discovery returned unparseable JSON", {
+      reason: error instanceof Error ? error.message : "unknown error"
+    });
+    return { ok: false, reason: "invalid-response" };
+  }
+
+  // A failure in here is not fatal: without it, named-port backends simply
+  // get no probe URL and render as "unknown" rather than the page failing.
+  const portLookup = await resolveNamedPorts(namedPortBackends(body), credentials);
+
+  const services = (body.items ?? [])
+    .map((item) => toServiceApp(item, portLookup))
+    .filter((service): service is LocalServiceApp => service !== null);
+
+  logger.info(`Discovered ${services.length} portal services from Kubernetes`);
+  return { ok: true, apps: services.sort(byOrderThenName), source: "cluster" };
 }
 
 function byOrderThenName(a: LocalServiceApp, b: LocalServiceApp): number {

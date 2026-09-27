@@ -81,6 +81,16 @@ export interface ServiceHealth {
 export type ServiceHealthMap = Record<string, ServiceHealth>;
 
 /**
+ * Why service discovery failed, as a closed set. Only this enum ever reaches
+ * the browser — raw apiserver bodies and error messages stay in the logs.
+ *
+ * - `unauthenticated`: the apiserver answered 401 (expired or wrong token).
+ * - `rbac`: 403 — the ClusterRole no longer grants what discovery needs.
+ * - `unreachable`: no usable answer (network error, timeout, 5xx, other status).
+ * - `invalid-response`: a 2xx whose body could not be parsed.
+ */
+export type DiscoveryFailure = "rbac" | "unauthenticated" | "unreachable" | "invalid-response";
+/**
  * The contract an Ingress uses to advertise itself to this portal.
  *
  * A chart in `deedlit.dev.infra` opts in with the label and then describes

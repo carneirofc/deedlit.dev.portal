@@ -92,6 +92,26 @@ cluster. Authentication is no defence there — the portal's entire audience is
 authenticated. The refresh button calls `invalidatePortalSnapshot()` first, so
 an explicit refresh is still a real one.
 
+## When discovery fails
+
+Coalescing means every reader waits on the same collection, so it has to end.
+Each apiserver call has a hard 6s deadline (the socket-idle timeout alone is
+not one — a peer trickling bytes would never trip it) and settles on every
+response-stream failure (`error`, `aborted`, a `close` before `end`). The whole
+collection is raced against a 16s ceiling on top of that.
+
+A failure is never shown as "no services". `discoverServices()` returns
+`{ ok: false, reason }` with `reason` one of `unauthenticated` (401), `rbac`
+(403), `unreachable` (thrown, timed out, any other status) or
+`invalid-response` (unparseable body). The snapshot then serves the last good
+list with `degraded` set — the page shows a banner with the reason and how old
+the list is — and caches the failure for 5s so a broken apiserver is not
+hammered. With no earlier list, `/api/portal/services` returns **503**; with
+one, it returns 200 plus `degraded`. Only the enum leaves the server.
+
+An RBAC regression therefore reads as "permission denied", not as a missing
+label. Fix the ClusterRole back to the two verbs listed above — never widen it.
+
 ## Adding a service
 
 Do it in `deedlit.dev.infra`, in the owning chart's `values.yaml`:
