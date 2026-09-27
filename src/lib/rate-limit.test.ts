@@ -46,3 +46,49 @@ describe("rateLimit", () => {
     expect(rateLimit("after-expiry", 10, 60_000).ok).toBe(true);
   });
 });
+
+describe("clientAddress", () => {
+  const headers = (entries: Record<string, string>) => new Headers(entries);
+
+  it("prefers CF-Connecting-IP, which Cloudflare's edge overwrites", async () => {
+    const { clientAddress } = await load();
+
+    expect(
+      clientAddress(
+        headers({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "1.2.3.4, 10.42.0.9" })
+      )
+    ).toBe("cf:203.0.113.7");
+    expect(clientAddress(headers({ "cf-connecting-ip": "2001:db8::1" }))).toBe("cf:2001:db8::1");
+  });
+
+  it("gives two tunnel clients separate keys even though XFF's last hop is shared", async () => {
+    const { clientAddress } = await load();
+    const tunnel = "10.42.0.9";
+
+    const a = clientAddress(headers({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": tunnel }));
+    const b = clientAddress(headers({ "cf-connecting-ip": "198.51.100.2", "x-forwarded-for": tunnel }));
+
+    expect(a).not.toBe(b);
+  });
+
+  it("ignores a CF-Connecting-IP that is not an IP literal", async () => {
+    const { clientAddress } = await load();
+
+    expect(
+      clientAddress(headers({ "cf-connecting-ip": "evil, 1.1.1.1", "x-forwarded-for": "10.0.0.1" }))
+    ).toBe("10.0.0.1");
+  });
+
+  it("falls back to the last X-Forwarded-For entry, never a client-written earlier one", async () => {
+    const { clientAddress } = await load();
+
+    expect(clientAddress(headers({ "x-forwarded-for": "6.6.6.6, 10.0.0.1" }))).toBe("10.0.0.1");
+    expect(clientAddress(headers({ "x-forwarded-for": " 10.0.0.1 , " }))).toBe("10.0.0.1");
+  });
+
+  it("shares one bucket when there is no header at all", async () => {
+    const { clientAddress } = await load();
+
+    expect(clientAddress(headers({}))).toBe("unknown");
+  });
+});

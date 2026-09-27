@@ -3,16 +3,8 @@ import { redirect } from "next/navigation";
 import { FiGithub, FiShield } from "react-icons/fi";
 import { OutlineButton, PageHeader, StatusBanner, SurfacePanel } from "@carneirofc/ui";
 import { auth, signIn, signInProviders } from "@/auth";
-import { clientKey, rateLimit } from "@/lib/rate-limit";
+import { clientKey, rateLimit, SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS } from "@/lib/rate-limit";
 import { safeCallbackUrl } from "@/lib/safe-redirect";
-
-/**
- * Sign-in is unauthenticated, so it is keyed on the client address rather than
- * a session. Each attempt costs an outbound round-trip to GitHub or the IdP;
- * ten a minute is generous for a human and unhelpful as an amplifier.
- */
-const SIGN_IN_LIMIT = 10;
-const SIGN_IN_WINDOW_MS = 60_000;
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -66,6 +58,8 @@ export default async function LoginPage({
     const provider = signInProviders().find((entry) => entry.id === requested);
     if (!provider) redirect("/login?error=Configuration");
 
+    // The Auth.js route handler enforces the same bucket; checking here as well
+    // turns a refusal into a friendly error page instead of a bare 429.
     const limited = rateLimit(await clientKey("sign-in"), SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS);
     if (!limited.ok) redirect("/login?error=RateLimited");
 
