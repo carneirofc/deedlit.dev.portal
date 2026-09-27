@@ -20,14 +20,67 @@ const env = (name: string) => process.env[name]?.trim() ?? "";
 const allowedOrg = () => env("AUTH_ALLOWED_GITHUB_ORG");
 const allowedTeam = () => env("AUTH_ALLOWED_GITHUB_TEAM");
 
-const allowedUsers = () =>
+/**
+ * One `AUTH_ALLOWED_GITHUB_USERS` entry. A login alone is a weak identifier:
+ * when an account is renamed or deleted, GitHub eventually frees the login and
+ * anyone can register it. So an entry can pin the immutable numeric id:
+ *
+ *   carneirofc:1234567   login and id — both must match (preferred)
+ *   1234567              id only
+ *   carneirofc           legacy: login only, warned about once
+ */
+export interface GitHubUserRule {
+  login?: string;
+  id?: string;
+}
+
+const warnedEntries = new Set<string>();
+
+function warnOnce(entry: string, message: string): void {
+  if (warnedEntries.has(entry)) return;
+  warnedEntries.add(entry);
+  logger.warn(message, { entry });
+}
+
+export function parseGitHubUserRule(raw: string): GitHubUserRule | null {
+  const entry = raw.trim().toLowerCase();
+  if (!entry) return null;
+
+  if (/^\d+$/.test(entry)) return { id: entry };
+
+  const pinned = /^([a-z0-9-]{1,39}):(\d+)$/.exec(entry);
+  if (pinned) return { login: pinned[1], id: pinned[2] };
+
+  if (/^[a-z0-9-]{1,39}$/.test(entry)) {
+    warnOnce(
+      entry,
+      "AUTH_ALLOWED_GITHUB_USERS entry is not pinned to an account id; a freed login can be " +
+        "re-registered by someone else. Use `login:id` (id from `gh api users/<login> --jq .id`)"
+    );
+    return { login: entry };
+  }
+
+  // Unrecognised shapes are dropped, never loosened into a partial match.
+  warnOnce(entry, "AUTH_ALLOWED_GITHUB_USERS entry ignored: not a login, an id, or login:id");
+  return null;
+}
+
+const allowedUsers = (): GitHubUserRule[] =>
   env("AUTH_ALLOWED_GITHUB_USERS")
     .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
+    .map(parseGitHubUserRule)
+    .filter((rule): rule is GitHubUserRule => rule !== null);
 
-function isAllowListedUser(login: string): boolean {
-  return allowedUsers().includes(login.toLowerCase());
+/** Every part a rule names must match; a rule naming nothing matches nobody. */
+function matchesUserRule(rule: GitHubUserRule, login: string, subject: string): boolean {
+  if (!rule.login && !rule.id) return false;
+  if (rule.login && rule.login !== login.toLowerCase()) return false;
+  if (rule.id && rule.id !== subject) return false;
+  return true;
+}
+
+function isAllowListedUser(login: string, subject: string): boolean {
+  return allowedUsers().some((rule) => matchesUserRule(rule, login, subject));
 }
 
 /**
@@ -104,9 +157,10 @@ async function isActiveTeamMember(
  */
 async function grantFor(
   login: string,
+  subject: string,
   token: string | undefined
 ): Promise<GitHubGrant | null> {
-  if (isAllowListedUser(login)) return { via: "user" };
+  if (isAllowListedUser(login, subject)) return { via: "user" };
 
   const org = allowedOrg();
   if (!org) return null;
@@ -159,7 +213,7 @@ export function githubSubject(profile: Record<string, unknown> | undefined): str
  * lifetime. Everything else is re-checked, because the grant records which
  * rule admitted the session and that rule must still exist:
  *
- * - `via: "user"`: the login must still be on the allow-list.
+ * - `via: "user"`: the allow-list entry must still match (login and pinned id).
  *   Configuring an org does not keep a removed user in.
  * - `via: "org"`: the configured org must be the one that admitted them, and
  *   a team restriction, if one is configured now, must be the team they were
@@ -173,11 +227,11 @@ export function reauthorizeGitHub(
   identity: { login: string; subject: string },
   grant: GitHubGrant | undefined
 ): boolean {
-  const { login } = identity;
+  const { login, subject } = identity;
   if (!login || !grant) return deny(login, "no sign-in grant recorded");
 
   if (grant.via === "user") {
-    return isAllowListedUser(login) || deny(login, "removed from the user allow-list");
+    return isAllowListedUser(login, subject) || deny(login, "removed from the user allow-list");
   }
 
   const org = allowedOrg().toLowerCase();
@@ -208,7 +262,7 @@ export async function authorizeGitHub(
   const login = githubUsername(profile);
   if (!login) return null;
 
-  const grant = await grantFor(login, accessToken);
+  const grant = await grantFor(login, githubSubject(profile), accessToken);
   if (!grant) {
     logger.warn("Portal sign-in denied: not an authorized GitHub member", { login });
   }

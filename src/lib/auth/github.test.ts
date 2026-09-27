@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { authorizeGitHub, type GitHubGrant, reauthorizeGitHub } from "./github";
+import {
+  authorizeGitHub,
+  type GitHubGrant,
+  parseGitHubUserRule,
+  reauthorizeGitHub
+} from "./github";
 
 const identity = (login: string, subject = "42") => ({ login, subject });
 
@@ -50,6 +55,48 @@ describe("reauthorizeGitHub — the grant must still be backed by config", () =>
     vi.stubEnv("AUTH_ALLOWED_GITHUB_ORG", "acme");
     vi.stubEnv("AUTH_ALLOWED_GITHUB_USERS", "alice");
     expect(reauthorizeGitHub(identity("alice"), undefined)).toBe(false);
+  });
+
+  it("re-checks a user grant against the pinned id", () => {
+    vi.stubEnv("AUTH_ALLOWED_GITHUB_USERS", "alice:42");
+    expect(reauthorizeGitHub(identity("alice", "42"), { via: "user" })).toBe(true);
+    expect(reauthorizeGitHub(identity("alice", "99"), { via: "user" })).toBe(false);
+  });
+});
+
+describe("AUTH_ALLOWED_GITHUB_USERS entries", () => {
+  it("parses login:id, id-only and legacy login entries", () => {
+    expect(parseGitHubUserRule(" CarneiroFC:42 ")).toEqual({ login: "carneirofc", id: "42" });
+    expect(parseGitHubUserRule("42")).toEqual({ id: "42" });
+    expect(parseGitHubUserRule("carneirofc")).toEqual({ login: "carneirofc" });
+  });
+
+  it("drops shapes it does not recognise instead of half-matching them", () => {
+    expect(parseGitHubUserRule("alice:")).toBeNull();
+    expect(parseGitHubUserRule(":42")).toBeNull();
+    expect(parseGitHubUserRule("a*")).toBeNull();
+    expect(parseGitHubUserRule("")).toBeNull();
+  });
+
+  const profile = (login: string, id: number) => ({ login, id });
+
+  it("requires both parts of login:id to match", async () => {
+    vi.stubEnv("AUTH_ALLOWED_GITHUB_USERS", "carneirofc:42");
+
+    expect(await authorizeGitHub(profile("carneirofc", 42), undefined)).toEqual({ via: "user" });
+    // A re-registered login: same name, new account.
+    expect(await authorizeGitHub(profile("carneirofc", 99), undefined)).toBeNull();
+    expect(await authorizeGitHub(profile("other", 42), undefined)).toBeNull();
+  });
+
+  it("matches an id-only entry whatever the login", async () => {
+    vi.stubEnv("AUTH_ALLOWED_GITHUB_USERS", "42");
+    expect(await authorizeGitHub(profile("anything", 42), undefined)).toEqual({ via: "user" });
+  });
+
+  it("still accepts a legacy login entry", async () => {
+    vi.stubEnv("AUTH_ALLOWED_GITHUB_USERS", "carneirofc");
+    expect(await authorizeGitHub(profile("CarneiroFC", 7), undefined)).toEqual({ via: "user" });
   });
 });
 
