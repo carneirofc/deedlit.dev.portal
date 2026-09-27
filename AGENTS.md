@@ -32,7 +32,7 @@
 - `AUTH_URL` is not optional in a deployment. `trustHost` makes Auth.js derive its origin from the `Host`/`X-Forwarded-Host` header, which a client controls; `AUTH_URL` pins it to configuration instead. Its scheme also decides `useSecureCookies`, so an `https://` value is what puts the `__Secure-` prefix and the `Secure` attribute on the session cookie. The chart sets it from the Ingress host — keep the two in step.
 
 ## Security
-- `src/proxy.ts` owns the security headers and generates a per-request CSP nonce, consumed by the inline theme script in `src/app/layout.tsx`. Adding another inline script means giving it that nonce — do not relax the policy to `unsafe-inline`.
+- `src/proxy.ts` owns the security headers and generates a per-request CSP nonce; the policy itself is built in `src/lib/csp.ts`. The policy is set on the **request** as well as the response: Next parses the nonce out of the request's `Content-Security-Policy` header and stamps it onto its own framework and RSC scripts (under `'strict-dynamic'` an un-nonced framework script is blocked and hydration dies), the browser enforces the response copy, and the inline theme script in `src/app/layout.tsx` reads it from `x-nonce`. Adding another inline script means giving it that nonce — do not relax the policy to `unsafe-inline`.
 - The portal's health prober takes its target from Kubernetes annotations, so `server/discover.ts` validates every component and `server/health.ts` re-checks the final URL before dialling. Keep that; see `src/features/services/README.md`.
 - The cluster read surface is two read-only verbs: `list` on label-selected Ingresses and `get` on the Services those Ingresses name (only for *named* backend ports). Do not reintroduce `GET /api/v1/services` — listing needs `list` on Services cluster-wide, which turns this token into a cluster inventory. Keep the ClusterRole in `deedlit.dev.infra` matched to the two verbs.
 - Discovery + probing go through `server/snapshot.ts` (15s TTL, in-flight coalescing). It exists to bound fan-out: one `/portal` render is one apiserver list plus one probe per service, and every reader is authenticated, so auth alone does not stop a reload loop. Call `invalidatePortalSnapshot()` from anything that must genuinely re-probe.
@@ -56,7 +56,7 @@
 
 ## Verification
 - `npx tsc --noEmit --project .` · `npm test` · `npm run build` · `npm run dev`.
-- `npm test` (Vitest, `vitest.config.mts`) covers the security-critical rules: OIDC allow-lists and issuer checks, `stillAuthorized`/`hasUsableSecret`, rate-limit windows, the discovery annotation parsers and the probe allow-list. A fix to any of these ships with a test that fails without it.
+- `npm test` (Vitest, `vitest.config.mts`) covers the security-critical rules: OIDC allow-lists and issuer checks, `stillAuthorized`/`hasUsableSecret`, rate-limit windows, the discovery annotation parsers and the probe allow-list, and the CSP. A fix to any of these ships with a test that fails without it.
 - Container: build from the repo root, then check `/api/health` → 200, `/api/portal/services` → 401 unauthenticated, `/portal` → 307 to `/login`.
 - `npm run lint` (Biome) must stay at zero errors for this package. `npm run test:e2e` is defined but has no committed specs yet.
 
