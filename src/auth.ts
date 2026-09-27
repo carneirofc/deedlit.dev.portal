@@ -28,8 +28,9 @@ import { safeAuthRedirect } from "@/lib/safe-redirect";
  *
  * Sessions are JWT-only: the portal stores nothing per user, so adding a
  * database adapter would buy nothing and cost a datastore. Authorization is
- * decided once, in `signIn` — the identity provider says *who* someone is,
- * the per-provider rules in `src/lib/auth/*` say whether they get in at all.
+ * decided in `signIn` — the identity provider says *who* someone is, the
+ * per-provider rules in `src/lib/auth/*` say whether they get in at all — and
+ * then re-derived on every request by `stillAuthorized()`.
  *
  * Two providers are supported and either may be omitted: GitHub (org/team
  * membership) and a generic OIDC issuer (`src/lib/auth/oidc.ts`). A provider
@@ -110,8 +111,14 @@ export function signInProviders(): SignInProvider[] {
  * is not the threat this guards against — that one is closed by cryptography
  * and by the minimum-length check above. The threat it *does* guard against is
  * subtler and far more likely: a token that was legitimately issued and has
- * since stopped deserving access, because the account was removed from an
- * allow-list, dropped out of a group, or the provider was switched off.
+ * since stopped deserving access because the *configuration* changed — the
+ * account or its group was removed from an allow-list, the GitHub org/team
+ * rule changed, or the provider was switched off.
+ *
+ * What is not re-checked is membership held at the provider: GitHub org/team
+ * membership (that needs the access token this app refuses to keep) and
+ * IdP-side group changes (groups come from the ID token at sign-in). Those
+ * take effect at the next sign-in, bounded by the session lifetime.
  *
  * So authorization is never stored as a yes and trusted later. Only the raw
  * identity is carried, and the decision is recomputed from it on every request
@@ -122,7 +129,13 @@ export function signInProviders(): SignInProvider[] {
 export function stillAuthorized(token: JWT): boolean {
   switch (token.provider) {
     case GITHUB_PROVIDER_ID:
-      return isGitHubConfigured() && reauthorizeGitHub(token.username ?? "");
+      return (
+        isGitHubConfigured() &&
+        reauthorizeGitHub(
+          { login: token.username ?? "", subject: token.subject ?? "" },
+          token.githubGrant
+        )
+      );
 
     case OIDC_PROVIDER_ID:
       return (
@@ -209,7 +222,7 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
 
       switch (account?.provider) {
         case GITHUB_PROVIDER_ID:
-          return await authorizeGitHub(claims, account.access_token);
+          return (await authorizeGitHub(claims, account.access_token)) !== null;
         case OIDC_PROVIDER_ID:
           return authorizeOidc(claims);
         default:
@@ -240,6 +253,13 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
         token.provider = GITHUB_PROVIDER_ID;
         token.username = githubUsername(claims) || token.username;
         token.subject = githubSubject(claims) || token.subject;
+        // `signIn` has already said yes, but Auth.js does not hand its result
+        // to this callback, so the grant — which rule admitted the user — is
+        // derived again here, while the access token still exists. It is
+        // evidence re-evaluated on every request, not a stored verdict.
+        const grant = await authorizeGitHub(claims, account.access_token);
+        if (!grant) return null;
+        token.githubGrant = grant;
       } else if (account?.provider === OIDC_PROVIDER_ID) {
         const identity = oidcIdentity(claims);
 

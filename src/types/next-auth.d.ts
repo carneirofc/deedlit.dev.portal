@@ -1,4 +1,5 @@
 import type { DefaultSession } from "next-auth";
+import type { GitHubGrant } from "@/lib/auth/github";
 
 declare module "next-auth" {
   interface Session {
@@ -35,5 +36,11 @@ declare module "next-auth/jwt" {
     verifiedEmail?: string;
     /** Normalised group claims, retained so access can be re-decided later. */
     groups?: string[];
+    /**
+     * Which GitHub rule admitted this session (user allow-list, or org/team).
+     * Evidence re-checked against the current config on every request — never
+     * a cached "authorized" flag.
+     */
+    githubGrant?: GitHubGrant;
   }
 }

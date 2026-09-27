@@ -26,6 +26,18 @@ const allowedUsers = () =>
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
 
+function isAllowListedUser(login: string): boolean {
+  return allowedUsers().includes(login.toLowerCase());
+}
+
+/**
+ * *Which* rule admitted a session — evidence, not a verdict. Stored in the JWT
+ * and re-evaluated against the current configuration on every request, so an
+ * org switch, an added team restriction or a removed allow-list entry revokes
+ * the sessions it no longer covers. Never collapse this into a boolean.
+ */
+export type GitHubGrant = { via: "user" } | { via: "org"; org: string; team?: string };
+
 /** A provider is offered only when it is fully configured — see `oidc.ts`. */
 export function isGitHubConfigured(): boolean {
   return Boolean(env("AUTH_GITHUB_ID") && env("AUTH_GITHUB_SECRET"));
@@ -82,37 +94,43 @@ async function isActiveTeamMember(
 }
 
 /**
- * Decides whether a freshly authenticated GitHub user may use the portal.
+ * Decides whether a freshly authenticated GitHub user may use the portal, and
+ * on what basis.
  *
  * Fails closed: every failure path — no token, no rule configured, API error,
- * timeout, inactive membership — returns false.
+ * timeout, inactive membership — returns null. The user allow-list is checked
+ * first, so someone in both gets `via: "user"` — the rule that survives an org
+ * change.
  */
-async function isAuthorized(login: string, token: string | undefined): Promise<boolean> {
-  const normalizedLogin = login.toLowerCase();
-
-  if (allowedUsers().includes(normalizedLogin)) return true;
+async function grantFor(
+  login: string,
+  token: string | undefined
+): Promise<GitHubGrant | null> {
+  if (isAllowListedUser(login)) return { via: "user" };
 
   const org = allowedOrg();
-  if (!org) return false;
+  if (!org) return null;
 
   if (!token) {
     logger.warn("Portal sign-in denied: GitHub returned no access token", { login });
-    return false;
+    return null;
   }
 
   try {
-    if (!(await isActiveOrgMember(org, token))) return false;
+    if (!(await isActiveOrgMember(org, token))) return null;
 
     const team = allowedTeam();
-    if (team) return await isActiveTeamMember(org, team, login, token);
+    if (team) {
+      return (await isActiveTeamMember(org, team, login, token)) ? { via: "org", org, team } : null;
+    }
 
-    return true;
+    return { via: "org", org };
   } catch (error) {
     logger.error("Portal sign-in denied: GitHub membership check failed", {
       login,
       reason: error instanceof Error ? error.message : "unknown error"
     });
-    return false;
+    return null;
   }
 }
 
@@ -137,37 +155,63 @@ export function githubSubject(profile: Record<string, unknown> | undefined): str
  * calling GitHub.
  *
  * The access token is deliberately not kept (see `src/auth.ts`), so org and
- * team membership cannot be re-verified here — that check happens once, at
- * sign-in, and its result is bounded by the session lifetime. What can be
- * re-checked is local and still worth it: an explicit allow-list entry that
- * has since been removed, and a configuration that has lost its rules
- * entirely. Both revoke at the user's next request rather than in eight hours.
+ * team *membership* cannot be re-verified here — that stands for the session
+ * lifetime. Everything else is re-checked, because the grant records which
+ * rule admitted the session and that rule must still exist:
+ *
+ * - `via: "user"`: the login must still be on the allow-list.
+ *   Configuring an org does not keep a removed user in.
+ * - `via: "org"`: the configured org must be the one that admitted them, and
+ *   a team restriction, if one is configured now, must be the team they were
+ *   admitted through. Removing a team restriction broadens the rule, so
+ *   team-granted sessions stay valid.
+ *
+ * A token without a grant (issued before grants existed) is refused, which
+ * costs one re-login and fails closed.
  */
-export function reauthorizeGitHub(login: string): boolean {
-  if (!login) return false;
-  if (allowedUsers().includes(login.toLowerCase())) return true;
+export function reauthorizeGitHub(
+  identity: { login: string; subject: string },
+  grant: GitHubGrant | undefined
+): boolean {
+  const { login } = identity;
+  if (!login || !grant) return deny(login, "no sign-in grant recorded");
 
-  // Admitted via org membership: re-verifying needs a credential this app
-  // refuses to store, so the sign-in decision stands for the session.
-  if (allowedOrg()) return true;
+  if (grant.via === "user") {
+    return isAllowListedUser(login) || deny(login, "removed from the user allow-list");
+  }
 
-  logger.warn("Portal access denied: no GitHub allow-list rule remains for this session", {
-    login
+  const org = allowedOrg().toLowerCase();
+  if (!org || grant.org.toLowerCase() !== org) return deny(login, "org rule changed");
+
+  const team = allowedTeam().toLowerCase();
+  if (team && grant.team?.toLowerCase() !== team) return deny(login, "team rule changed");
+
+  return true;
+}
+
+function deny(login: string, reason: string): false {
+  logger.warn("Portal access denied: GitHub session no longer matches a rule", {
+    login: login || "(none)",
+    reason
   });
   return false;
 }
 
+/**
+ * The sign-in decision. Returns the grant that admitted the user, or null.
+ * Network calls to GitHub when an org rule is configured.
+ */
 export async function authorizeGitHub(
   profile: Record<string, unknown> | undefined,
   accessToken: string | undefined
-): Promise<boolean> {
+): Promise<GitHubGrant | null> {
   const login = githubUsername(profile);
-  if (!login) return false;
+  if (!login) return null;
 
-  const authorized = await isAuthorized(login, accessToken);
-  if (!authorized) {
+  const grant = await grantFor(login, accessToken);
+  if (!grant) {
     logger.warn("Portal sign-in denied: not an authorized GitHub member", { login });
   }
 
-  return authorized;
+  return grant;
 }
