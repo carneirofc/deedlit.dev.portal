@@ -34,7 +34,7 @@ const IN_CLUSTER_HOST = new RegExp(`^${DNS_LABEL}\\.${DNS_LABEL}\\.svc\\.cluster
  * also admit `anything.attacker.example.svc.cluster.local`, which is a name an
  * attacker who controls a DNS zone can make resolve wherever they like.
  */
-function isProbeTargetAllowed(rawUrl: string): boolean {
+export function isProbeTargetAllowed(rawUrl: string): boolean {
   let url: URL;
   try {
     url = new URL(rawUrl);

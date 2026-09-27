@@ -46,7 +46,7 @@
 - `Dockerfile` builds from this repo's root (`docker build --secret id=npm_token,env=NODE_AUTH_TOKEN -t portal .`). `@carneirofc/ui` is a published GitHub Packages dependency, so `npm ci` needs registry auth — the token is mounted as a BuildKit secret into a throwaway `.npmrc` in the `deps` stage only, never copied into a later stage. Standalone output runs as `node server.js`.
 - Runtime is **distroless** (`gcr.io/distroless/nodejs24-debian12`) and both bases are **pinned by digest**. The Debian-slim runtime used to carry npm and yarn, which were the source of every CRITICAL/HIGH image finding that was not the app itself; distroless also removes the shell, so there is no interactive foothold in a compromised pod. `USER 1001:1001` is numeric to match `podSecurityContext.runAsUser` and satisfy `runAsNonRoot`. Refresh a digest by re-pulling the tag and reading `RepoDigests` — the Dockerfile header has the command.
 - The build also deletes `node_modules/typescript` from the standalone output: Next's tracer pulls the compiler in via a dev-only code path in `next-server`, and it is 19 MB a production server never loads.
-- `.github/workflows/portal.yml` typechecks, audits, hadolints, **builds and Trivy-scans the image before any push**, then publishes to `ghcr.io/carneirofc/deedlit.dev-portal` and prints the digest to pin in `apps/portal/values-prd.yaml`. Scanner exceptions live in `.trivyignore.yaml` at the repo root and every one of them must carry an `expired_at`.
+- `.github/workflows/portal.yml` lints, typechecks, runs the unit tests, audits, hadolints, **builds and Trivy-scans the image before any push**, then publishes to `ghcr.io/carneirofc/deedlit.dev-portal` and prints the digest to pin in `apps/portal/values-prd.yaml`. Scanner exceptions live in `.trivyignore.yaml` at the repo root and every one of them must carry an `expired_at`.
 - `package-lock.json` is **multi-platform** and must stay that way: it carries the optional native binaries (`lightningcss`, `@tailwindcss/oxide`, `sharp`, …) for win32, linux-gnu, linux-musl and darwin, so `npm ci` works on a Windows workstation and in a Linux container alike. It was win32-only once, which made `npm ci` on Linux silently skip those binaries and the Tailwind build fail with `Cannot find module '../lightningcss.linux-x64-gnu.node'`. If that returns, re-add the missing platforms rather than special-casing the Dockerfile — `npm install --package-lock-only --include=optional --os=linux --cpu=x64 --libc=glibc` (repeat per platform) on a machine with a fresh lockfile, or patch the entries in directly.
 - `/api/health` is the unauthenticated liveness/readiness endpoint.
 
@@ -55,7 +55,8 @@
 - Service listings are data from the cluster, not code here — to add a service, annotate its Ingress in `deedlit.dev.infra`.
 
 ## Verification
-- `npx tsc --noEmit --project .` · `npm run build` · `npm run dev`.
+- `npx tsc --noEmit --project .` · `npm test` · `npm run build` · `npm run dev`.
+- `npm test` (Vitest, `vitest.config.mts`) covers the security-critical rules: OIDC allow-lists and issuer checks, `stillAuthorized`/`hasUsableSecret`, rate-limit windows, the discovery annotation parsers and the probe allow-list. A fix to any of these ships with a test that fails without it.
 - Container: build from the repo root, then check `/api/health` → 200, `/api/portal/services` → 401 unauthenticated, `/portal` → 307 to `/login`.
 - `npm run lint` (Biome) must stay at zero errors for this package. `npm run test:e2e` is defined but has no committed specs yet.
 

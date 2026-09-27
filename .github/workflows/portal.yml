@@ -40,6 +40,11 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      # Unit tests for the security-critical rules (redirects, allow-lists,
+      # rate-limit keys, CSP, discovery). Gates the image build below.
+      - name: Test
+        run: npm test
+
       # Fails the build on a known-vulnerable runtime dependency.
       # `--omit=dev` because dev deps do not reach the runtime stage.
       - name: Audit production dependencies

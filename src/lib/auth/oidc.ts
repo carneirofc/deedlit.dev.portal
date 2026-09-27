@@ -34,7 +34,7 @@ const list = (name: string) =>
  * rewrite it, so `http://` issuers are refused outside loopback (where the
  * only realistic caller is a developer running an IdP locally).
  */
-function isUsableIssuer(issuer: string): boolean {
+export function isUsableIssuer(issuer: string): boolean {
   let url: URL;
   try {
     url = new URL(issuer);

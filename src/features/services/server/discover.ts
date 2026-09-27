@@ -192,21 +192,24 @@ function parseOrder(raw: string | undefined): number {
  * this is what stops an annotation from redirecting the prober at an
  * arbitrary target.
  */
-function parseHealthPath(raw: string | undefined): string {
+export function parseHealthPath(raw: string | undefined): string {
   if (!raw) return "/";
   if (!raw.startsWith("/") || raw.startsWith("//") || raw.includes("..")) return "/";
   if (/[^\w\-./~%?=&]/.test(raw)) return "/";
   return raw;
 }
 
-function parsePort(raw: string | undefined, fallback: number | undefined): number | undefined {
-  const parsed = Number.parseInt(raw ?? "", 10);
+export function parsePort(raw: string | undefined, fallback: number | undefined): number | undefined {
+  // Digits only: `parseInt("80abc")` is 80, and a malformed annotation should
+  // fall back rather than be half-read.
+  if (!raw || !/^\d{1,5}$/.test(raw)) return fallback;
+  const parsed = Number.parseInt(raw, 10);
   if (Number.isInteger(parsed) && parsed > 0 && parsed < 65536) return parsed;
   return fallback;
 }
 
 /** RFC 1123 label check — namespace and service names are used to build a URL. */
-function isValidDnsLabel(value: string | undefined): value is string {
+export function isValidDnsLabel(value: string | undefined): value is string {
   return !!value && /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(value) && value.length <= 63;
 }
 

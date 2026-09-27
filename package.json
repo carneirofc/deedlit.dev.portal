@@ -11,6 +11,7 @@
     "lint:fix": "biome lint . --write",
     "scrape-goodreads": "tsx scripts/scrape-goodreads.ts",
     "playwright-examples": "tsx scripts/playwright-examples.ts",
+    "test": "vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -36,6 +37,7 @@
     "tailwindcss": "4.2.0",
     "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^5.0.2"
   }
 }

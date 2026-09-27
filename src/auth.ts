@@ -52,7 +52,7 @@ const MIN_SECRET_LENGTH = 32;
  * Checked per sign-in rather than at module load: this module is imported
  * during `next build`, where no secret exists and a throw would break CI.
  */
-function hasUsableSecret(): boolean {
+export function hasUsableSecret(): boolean {
   const secret = process.env.AUTH_SECRET ?? "";
   if (secret.length >= MIN_SECRET_LENGTH) return true;
 
@@ -118,7 +118,7 @@ export function signInProviders(): SignInProvider[] {
  * session immediately. It is a local comparison against environment
  * configuration, so this costs no network round-trip.
  */
-function stillAuthorized(token: JWT): boolean {
+export function stillAuthorized(token: JWT): boolean {
   switch (token.provider) {
     case GITHUB_PROVIDER_ID:
       return isGitHubConfigured() && reauthorizeGitHub(token.username ?? "");
