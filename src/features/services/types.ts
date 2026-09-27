@@ -55,6 +55,8 @@ export interface LocalServiceApp {
   url: string;
   description: string;
   status: ServiceStatus;
+  /** Namespace of the Ingress it was discovered from; absent for the static list. */
+  namespace?: string;
   category: ServiceCategory;
   icon: ServiceIcon;
   /** Sort weight from the `portal.deedlit.dev/order` annotation. */

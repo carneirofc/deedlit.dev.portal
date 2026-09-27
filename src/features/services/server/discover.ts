@@ -350,9 +350,37 @@ async function resolveNamedPorts(
   return lookup;
 }
 
-function toServiceApp(
+/**
+ * Every field on a card comes from an Ingress, and the portal presents cards
+ * to its signed-in audience as trusted links — so a card pointing off-domain
+ * (a lookalike "Keycloak" at an attacker's host) would borrow the portal's
+ * authority. Only hosts under these suffixes are published.
+ */
+const DEFAULT_HOST_SUFFIXES = ["deedlit.dev"];
+
+export function allowedHostSuffixes(): string[] {
+  const configured = (process.env.PORTAL_ALLOWED_HOST_SUFFIXES ?? "")
+    .split(",")
+    .map((entry) => entry.trim().toLowerCase().replace(/^\./, ""))
+    .filter(Boolean);
+  return configured.length ? configured : DEFAULT_HOST_SUFFIXES;
+}
+
+/**
+ * Exact match or a subdomain on a label boundary: `xdeedlit.dev` is not under
+ * `deedlit.dev`. Wildcard hosts are refused — there is no single place a card
+ * for `*.deedlit.dev` could honestly link to.
+ */
+export function isAllowedHost(host: string, suffixes: string[]): boolean {
+  const name = host.toLowerCase();
+  if (!/^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$/.test(name) || name.includes("..")) return false;
+  return suffixes.some((suffix) => name === suffix || name.endsWith(`.${suffix}`));
+}
+
+export function toServiceApp(
   item: NonNullable<IngressListResponse["items"]>[number],
-  portLookup: PortLookup
+  portLookup: PortLookup,
+  hostSuffixes: string[] = allowedHostSuffixes()
 ): LocalServiceApp | null {
   const namespace = item.metadata?.namespace;
   const ingressName = item.metadata?.name;
@@ -361,6 +389,14 @@ function toServiceApp(
   const rule = item.spec?.rules?.find((candidate) => candidate.host);
   const host = rule?.host;
   if (!host || !ingressName || !isValidDnsLabel(namespace)) return null;
+
+  if (!isAllowedHost(host, hostSuffixes)) {
+    logger.warn("Portal card dropped: Ingress host is outside PORTAL_ALLOWED_HOST_SUFFIXES", {
+      ingress: `${namespace}/${ingressName}`,
+      host
+    });
+    return null;
+  }
 
   const backend = rule?.http?.paths?.find((path) => path.backend?.service?.name)?.backend?.service;
   const backendName = backend?.name;
@@ -390,6 +426,7 @@ function toServiceApp(
     name: pickAnnotation(annotations, PORTAL_ANNOTATIONS.name) ?? ingressName,
     host,
     url: `https://${host}`,
+    namespace,
     description:
       pickAnnotation(annotations, PORTAL_ANNOTATIONS.description) ?? `Ingress in ${namespace}.`,
     status: "online",
@@ -461,12 +498,40 @@ export async function discoverServices(): Promise<DiscoveryResult> {
   // get no probe URL and render as "unknown" rather than the page failing.
   const portLookup = await resolveNamedPorts(namedPortBackends(body), credentials);
 
-  const services = (body.items ?? [])
-    .map((item) => toServiceApp(item, portLookup))
-    .filter((service): service is LocalServiceApp => service !== null);
+  const hostSuffixes = allowedHostSuffixes();
+  const services = dedupeByHost(
+    (body.items ?? [])
+      .map((item) => toServiceApp(item, portLookup, hostSuffixes))
+      .filter((service): service is LocalServiceApp => service !== null)
+  );
 
   logger.info(`Discovered ${services.length} portal services from Kubernetes`);
   return { ok: true, apps: services.sort(byOrderThenName), source: "cluster" };
+}
+
+/**
+ * Two Ingresses claiming one host would render two cards for one address, and
+ * the second is as likely to be a lookalike as a mistake. One card is shown —
+ * the first listed — and the collision is logged with both namespaces.
+ */
+export function dedupeByHost(services: LocalServiceApp[]): LocalServiceApp[] {
+  const byHost = new Map<string, LocalServiceApp>();
+
+  for (const service of services) {
+    const key = service.host.toLowerCase();
+    const existing = byHost.get(key);
+    if (existing) {
+      logger.warn("Portal card dropped: host already claimed by another Ingress", {
+        host: service.host,
+        kept: `${existing.namespace}/${existing.name}`,
+        dropped: `${service.namespace}/${service.name}`
+      });
+      continue;
+    }
+    byHost.set(key, service);
+  }
+
+  return [...byHost.values()];
 }
 
 function byOrderThenName(a: LocalServiceApp, b: LocalServiceApp): number {

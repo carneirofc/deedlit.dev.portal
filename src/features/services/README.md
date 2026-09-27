@@ -131,6 +131,25 @@ To add a new **icon**, extend `ServiceIcon` and `SERVICE_ICONS` in `types.ts`
 and add the glyph to `ServiceGlyph.tsx`. Unknown values fall back to `generic`
 rather than rendering an empty card.
 
+## Who can publish a card
+
+Discovery lists labelled Ingresses **cluster-wide**, and every field on a card
+comes from the Ingress. So the assumption, stated explicitly: *every principal
+able to create a labelled Ingress on an allowed host is trusted to publish to
+the portal.* Three things narrow what that principal can do:
+
+- Only hosts under `PORTAL_ALLOWED_HOST_SUFFIXES` (default `deedlit.dev`,
+  matched on a label boundary, wildcards refused) become cards, so a card
+  cannot point off-domain.
+- Two Ingresses claiming one host produce one card (the first listed); the
+  collision is logged with both namespaces.
+- Each card shows its namespace, so one that does not belong is visible.
+
+If anyone other than the operator can create Ingresses (CI tokens, shared
+namespaces, operators generating Ingresses), restrict discovery to a namespace
+allow-list with per-namespace `Role`s — tracked in
+`docs/plans/portal-review/06-ingress-trust-boundary.md`.
+
 ## Security notes
 
 Annotations are operator-supplied input, so the probe target is never built

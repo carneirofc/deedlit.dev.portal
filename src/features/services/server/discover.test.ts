@@ -4,8 +4,17 @@ import { createServer, type Server } from "node:https";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getJson, isValidDnsLabel, parseHealthPath, parsePort } from "./discover";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import type { LocalServiceApp } from "@/features/services/types";
+import {
+  dedupeByHost,
+  getJson,
+  isAllowedHost,
+  isValidDnsLabel,
+  parseHealthPath,
+  parsePort,
+  toServiceApp
+} from "./discover";
 
 describe("annotation parsers", () => {
   it.each(["//x", "/../x", "http://x", "/a b", "/a#b", "x", "/a\\b"])(
@@ -33,6 +42,89 @@ describe("annotation parsers", () => {
     expect(isValidDnsLabel("-bad")).toBe(false);
     expect(isValidDnsLabel("a.b")).toBe(false);
     expect(isValidDnsLabel("a".repeat(64))).toBe(false);
+  });
+});
+
+describe("isAllowedHost", () => {
+  const suffixes = ["deedlit.dev"];
+
+  it.each([
+    ["deedlit.dev", true],
+    ["auth.deedlit.dev", true],
+    ["a.b.deedlit.dev", true],
+    ["login.evil.example", false],
+    ["xdeedlit.dev", false],
+    ["deedlit.dev.evil.example", false],
+    ["*.deedlit.dev", false],
+    ["a..deedlit.dev", false],
+    ["auth.deedlit.dev/path", false]
+  ])("%s → %s", (host, allowed) => {
+    expect(isAllowedHost(host, suffixes)).toBe(allowed);
+  });
+});
+
+describe("toServiceApp", () => {
+  beforeEach(() => vi.stubEnv("PORTAL_ALLOWED_HOST_SUFFIXES", ""));
+
+  const ingress = (overrides: { host?: string; annotations?: Record<string, string> } = {}) => ({
+    metadata: {
+      name: "registry",
+      namespace: "zot",
+      uid: "uid-1",
+      annotations: overrides.annotations ?? {}
+    },
+    spec: {
+      rules: [
+        {
+          host: overrides.host ?? "registry.deedlit.dev",
+          http: { paths: [{ backend: { service: { name: "zot", port: { number: 5000 } } } }] }
+        }
+      ]
+    }
+  });
+
+  it("builds the probe URL from validated parts only", () => {
+    const app = toServiceApp(
+      ingress({ annotations: { "portal.deedlit.dev/health-path": "//evil.example/x" } }),
+      new Map()
+    );
+
+    expect(app?.probeUrl).toBe("http://zot.zot.svc.cluster.local:5000/");
+    expect(app?.namespace).toBe("zot");
+  });
+
+  it("drops an Ingress whose host is off the allowed domain", () => {
+    expect(toServiceApp(ingress({ host: "keycloak-login.evil.example" }), new Map())).toBeNull();
+  });
+
+  it("honours PORTAL_ALLOWED_HOST_SUFFIXES", () => {
+    vi.stubEnv("PORTAL_ALLOWED_HOST_SUFFIXES", "example.org, .lan");
+    expect(toServiceApp(ingress({ host: "nas.lan" }), new Map())).not.toBeNull();
+    expect(toServiceApp(ingress({ host: "registry.deedlit.dev" }), new Map())).toBeNull();
+  });
+});
+
+describe("dedupeByHost", () => {
+  const app = (id: string, host: string): LocalServiceApp => ({
+    id,
+    name: id,
+    host,
+    url: `https://${host}`,
+    description: "",
+    status: "online",
+    category: "other",
+    icon: "generic",
+    order: 0
+  });
+
+  it("keeps one card per host, the first listed", () => {
+    const result = dedupeByHost([
+      app("real", "auth.deedlit.dev"),
+      app("copy", "AUTH.deedlit.dev"),
+      app("other", "s3.deedlit.dev")
+    ]);
+
+    expect(result.map((entry) => entry.id)).toEqual(["real", "other"]);
   });
 });
 
