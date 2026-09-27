@@ -2,7 +2,8 @@
 
 Powers `/portal`, the authenticated dashboard listing the cluster's services
 and their health. Everything here is server-side; the only client code is the
-search box and the copy-to-clipboard buttons.
+search box, the copy-to-clipboard buttons, the refresh button and the
+"checked N s ago" freshness label.
 
 ## Structure
 
@@ -11,7 +12,8 @@ search box and the copy-to-clipboard buttons.
 | `server/discover.ts`          | Lists services from the Kubernetes API                    |
 | `server/health.ts`            | Probes each service in-cluster                            |
 | `server/snapshot.ts`          | Shared 15s snapshot; bounds the probe fan-out             |
-| `components/ServicesSection.tsx` | Renders the grid; search + copy only                   |
+| `components/ServicesSection.tsx` | Renders the grid, freshness and the degraded banner   |
+| `components/RefreshButton.tsx` | Refresh with pending state and rate-limit feedback       |
 | `components/ServiceGlyph.tsx` | Icon lookup, with a `generic` fallback                    |
 | `data/local-services.ts`      | Development fallback when there is no cluster             |
 | `types.ts`                    | Shared types and the annotation contract                  |
@@ -90,7 +92,8 @@ list plus one probe per service, so without it a signed-in user holding F5
 would turn one session into continuous traffic against every service in the
 cluster. Authentication is no defence there — the portal's entire audience is
 authenticated. The refresh button calls `invalidatePortalSnapshot()` first, so
-an explicit refresh is still a real one.
+an explicit refresh is still a real one — unless it is over its limit, in which
+case the page re-renders from cache and says so.
 
 ## When discovery fails
 

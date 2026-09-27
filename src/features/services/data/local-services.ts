@@ -18,7 +18,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "pgadmin.deedlit.dev",
     url: "https://pgadmin.deedlit.dev",
     description: "PostgreSQL administration console.",
-    status: "online",
     category: "ops",
     icon: "database",
     order: 10
@@ -29,7 +28,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "rustfs.deedlit.dev",
     url: "https://rustfs.deedlit.dev",
     description: "Object storage browser and bucket administration.",
-    status: "online",
     category: "storage",
     icon: "files",
     order: 20
@@ -40,7 +38,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "s3.deedlit.dev",
     url: "https://s3.deedlit.dev",
     description: "S3-compatible endpoint backing the image library.",
-    status: "online",
     category: "storage",
     icon: "storage",
     order: 21
@@ -51,7 +48,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "registry.deedlit.dev",
     url: "https://registry.deedlit.dev",
     description: "Private OCI registry for images built outside the cluster.",
-    status: "online",
     category: "ops",
     icon: "registry",
     order: 30
@@ -62,7 +58,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "auth.deedlit.dev",
     url: "https://auth.deedlit.dev",
     description: "Identity provider (OIDC).",
-    status: "offline",
     category: "auth",
     icon: "idp",
     order: 40
@@ -73,7 +68,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "books.deedlit.dev",
     url: "https://books.deedlit.dev",
     description: "Ebook and audiobook library.",
-    status: "offline",
     category: "media",
     icon: "books",
     order: 50
@@ -84,7 +78,6 @@ export const localServiceApps: LocalServiceApp[] = [
     host: "readest.deedlit.dev",
     url: "https://readest.deedlit.dev",
     description: "Ebook reader, storing files in RustFS.",
-    status: "offline",
     category: "media",
     icon: "books",
     order: 51

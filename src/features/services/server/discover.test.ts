@@ -111,7 +111,6 @@ describe("dedupeByHost", () => {
     host,
     url: `https://${host}`,
     description: "",
-    status: "online",
     category: "other",
     icon: "generic",
     order: 0

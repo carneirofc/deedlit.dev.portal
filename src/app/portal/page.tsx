@@ -18,11 +18,17 @@ import { getPortalSnapshot } from "@/features/services/server/snapshot";
 export const dynamic = "force-dynamic";
 
 async function ServicesPanel() {
-  const { apps, health } = await getPortalSnapshot();
+  const { apps, health, collectedAt, degraded } = await getPortalSnapshot();
 
   return (
     <SurfacePanel tone="soft" padding="none" className="scroll-mt-20 overflow-hidden">
-      <ServicesSection apps={apps} health={health} refreshAction={refreshServices} />
+      <ServicesSection
+        apps={apps}
+        health={health}
+        collectedAt={collectedAt}
+        degraded={degraded}
+        refreshAction={refreshServices}
+      />
     </SurfacePanel>
   );
 }

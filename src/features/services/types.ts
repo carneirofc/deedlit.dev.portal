@@ -1,5 +1,3 @@
-export type ServiceStatus = "online" | "degraded" | "offline";
-
 export type ServiceIcon =
   | "gallery"
   | "prompt"
@@ -54,7 +52,6 @@ export interface LocalServiceApp {
   host: string;
   url: string;
   description: string;
-  status: ServiceStatus;
   /** Namespace of the Ingress it was discovered from; absent for the static list. */
   namespace?: string;
   category: ServiceCategory;
@@ -92,6 +89,16 @@ export type ServiceHealthMap = Record<string, ServiceHealth>;
  * - `invalid-response`: a 2xx whose body could not be parsed.
  */
 export type DiscoveryFailure = "rbac" | "unauthenticated" | "unreachable" | "invalid-response";
+
+/**
+ * What the refresh action reports back. `refreshed: false` means the limit was
+ * hit and the page re-rendered from cache — without saying so, a no-op looks
+ * exactly like a successful re-probe. `null` before the first submit.
+ */
+export interface RefreshState {
+  refreshed: boolean | null;
+}
+
 /**
  * The contract an Ingress uses to advertise itself to this portal.
  *

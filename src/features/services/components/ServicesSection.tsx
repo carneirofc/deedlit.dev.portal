@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { FiRefreshCw, FiLink, FiExternalLink } from "react-icons/fi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FiLink, FiExternalLink } from "react-icons/fi";
 import {
   CopyIcon,
   OutlineButton,
   SectionLabel,
   StatusBadge,
+  StatusBanner,
   SurfacePanel,
   TextInput
 } from "@carneirofc/ui";
+import { RefreshButton } from "@/features/services/components/RefreshButton";
 import { ServiceGlyph } from "@/features/services/components/ServiceGlyph";
 import type {
+  DiscoveryFailure,
   LocalServiceApp,
+  RefreshState,
   ServiceHealth,
   ServiceHealthMap
 } from "@/features/services/types";
@@ -20,8 +24,54 @@ import type {
 interface ServicesSectionProps {
   apps: LocalServiceApp[];
   health: ServiceHealthMap;
-  /** Server action: re-probes and revalidates the page. */
-  refreshAction: () => Promise<void>;
+  /** When the probes behind `health` ran. */
+  collectedAt: string;
+  /** Set when discovery is failing and this is the last good view (or none). */
+  degraded?: { reason: DiscoveryFailure; since: string; servingLastGood: boolean };
+  /** Server action: re-probes (unless rate-limited) and revalidates the page. */
+  refreshAction: (previous: RefreshState) => Promise<RefreshState>;
+}
+
+const FAILURE_LABEL: Record<DiscoveryFailure, string> = {
+  rbac: "permission denied by the Kubernetes API",
+  unauthenticated: "the service account token was rejected",
+  unreachable: "the Kubernetes API is unreachable",
+  "invalid-response": "the Kubernetes API returned an unreadable response"
+};
+
+const COPY_MESSAGE_MS = 2_000;
+const RELATIVE_TICK_MS = 10_000;
+
+function relativeTime(iso: string, now: number): string {
+  const seconds = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  return `${Math.round(minutes / 60)} h ago`;
+}
+
+/** Re-renders every `RELATIVE_TICK_MS` so "checked 10s ago" keeps counting. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), RELATIVE_TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  return now;
+}
+
+/**
+ * The server and the browser render this a few seconds apart, so the text is
+ * allowed to differ at hydration; the absolute time is in `dateTime`/`title`.
+ */
+function RelativeTime({ iso, now }: { iso: string; now: number }) {
+  return (
+    <time dateTime={iso} title={new Date(iso).toLocaleString()} suppressHydrationWarning>
+      {relativeTime(iso, now)}
+    </time>
+  );
 }
 
 const STATUS_LABEL: Record<ServiceHealth["state"], string> = {
@@ -48,11 +98,22 @@ const STATUS_BAR: Record<ServiceHealth["state"], string> = {
  * Discovery and health probing both happen on the server and arrive as props,
  * so the first paint already carries real statuses — there is no loading pass
  * and no client-side probing (which CORS made impossible anyway). This stays a
- * client component only for the search box and the clipboard buttons.
+ * client component for the search box, the clipboard buttons, the refresh
+ * feedback and the "checked N s ago" counter — staleness is always shown.
  */
-export function ServicesSection({ apps, health, refreshAction }: ServicesSectionProps) {
+export function ServicesSection({
+  apps,
+  health,
+  collectedAt,
+  degraded,
+  refreshAction
+}: ServicesSectionProps) {
   const [query, setQuery] = useState("");
   const [copyState, setCopyState] = useState("");
+  const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const now = useNow();
+
+  useEffect(() => () => clearTimeout(copyTimer.current), []);
 
   const filteredApps = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -65,16 +126,17 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
 
   const upCount = apps.filter((app) => health[app.id]?.state === "up").length;
 
-  const copyValue = async (value: string, event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
+  // The copy buttons are siblings of the card's link, not inside it, so a
+  // click here can never also open the service.
+  const copyValue = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
       setCopyState(`Copied: ${value}`);
     } catch {
       setCopyState("Copy unavailable");
     }
-    setTimeout(() => setCopyState(""), 2000);
+    clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopyState(""), COPY_MESSAGE_MS);
   };
 
   return (
@@ -106,6 +168,12 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
       <div className="mb-4 flex items-center justify-between">
         <p className="text-xs text-muted" aria-live="polite">
           {filteredApps.length}/{apps.length} services · {upCount} up
+          {(!degraded || degraded.servingLastGood) && (
+            <>
+              {" "}
+              · checked <RelativeTime iso={collectedAt} now={now} />
+            </>
+          )}
         </p>
         <div className="flex items-center gap-3">
           {copyState && (
@@ -113,16 +181,28 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
               {copyState}
             </p>
           )}
-          <form action={refreshAction}>
-            <OutlineButton type="submit" controlSize="xs" title="Re-run the health checks">
-              <FiRefreshCw className="h-3.5 w-3.5" />
-              Refresh
-            </OutlineButton>
-          </form>
+          <RefreshButton action={refreshAction} />
         </div>
       </div>
 
-      {apps.length === 0 && (
+      {degraded && (
+        <div className="mb-4">
+          <StatusBanner tone="error">
+            Service discovery is failing ({FAILURE_LABEL[degraded.reason]}) since{" "}
+            <RelativeTime iso={degraded.since} now={now} />.{" "}
+            {degraded.servingLastGood ? (
+              <>
+                Showing the list from <RelativeTime iso={collectedAt} now={now} />; statuses may
+                be out of date.
+              </>
+            ) : (
+              "No earlier list is available."
+            )}
+          </StatusBanner>
+        </div>
+      )}
+
+      {!degraded && apps.length === 0 && (
         <SurfacePanel tone="subtle" padding="lg">
           <p className="text-sm text-muted">
             No services are advertising themselves to the portal. An Ingress needs the label{" "}
@@ -139,13 +219,14 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
           const detail = health[app.id]?.detail;
           const isUp = state === "up";
 
+          // The card is not a link: `<a>` may not contain buttons. The title
+          // carries the link and stretches its hit area over the whole card
+          // (`after:absolute after:inset-0`); the copy buttons sit above that
+          // overlay, so each control is reached, announced and clicked alone.
           return (
-            <a
+            <article
               key={app.id}
-              href={app.url}
-              target="_blank"
-              rel="noreferrer"
-              className={`focus-ring group relative block overflow-hidden rounded-xl2 border shadow-soft transition-all duration-200 ${
+              className={`group relative overflow-hidden rounded-xl2 border shadow-soft transition-all duration-200 focus-within:border-accent/50 ${
                 state === "down"
                   ? "border-line/40 bg-surface/30 opacity-60"
                   : "border-line/80 bg-surface/75 hover:border-accent/50 hover:bg-surface hover:shadow-md"
@@ -167,7 +248,14 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
                     </span>
                     <div className="min-w-0">
                       <h3 className="text-lg font-semibold tracking-tight transition-colors group-hover:text-accent">
-                        {app.name}
+                        <a
+                          href={app.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="focus-ring rounded-sm after:absolute after:inset-0 after:content-['']"
+                        >
+                          {app.name}
+                        </a>
                       </h3>
                       <p className="mt-1 line-clamp-2 text-xs text-muted">{app.description}</p>
                     </div>
@@ -188,23 +276,29 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
                 <div className="mt-3 flex items-center justify-between gap-2">
                   <p className="truncate font-[var(--font-mono)] text-[11px] text-muted/80">
                     {app.host}
+                    {app.namespace && (
+                      <span className="text-muted/50" title="Kubernetes namespace of the Ingress">
+                        {" "}
+                        · {app.namespace}
+                      </span>
+                    )}
                   </p>
-                  <div className="flex shrink-0 gap-1.5">
+                  <div className="relative z-10 flex shrink-0 gap-1.5">
                     <OutlineButton
                       type="button"
                       controlSize="icon"
-                      onClick={(event) => copyValue(app.host, event)}
+                      onClick={() => copyValue(app.host)}
                       title="Copy hostname"
-                      aria-label="Copy hostname"
+                      aria-label={`Copy hostname of ${app.name}`}
                     >
                       <CopyIcon size="h-3.5 w-3.5" />
                     </OutlineButton>
                     <OutlineButton
                       type="button"
                       controlSize="icon"
-                      onClick={(event) => copyValue(app.url, event)}
+                      onClick={() => copyValue(app.url)}
                       title="Copy URL"
-                      aria-label="Copy URL"
+                      aria-label={`Copy URL of ${app.name}`}
                     >
                       <FiLink className="h-3.5 w-3.5" />
                     </OutlineButton>
@@ -212,13 +306,16 @@ export function ServicesSection({ apps, health, refreshAction }: ServicesSection
                 </div>
 
                 {isUp && (
-                  <div className="mt-3 flex items-center gap-1.5 text-xs text-accent opacity-0 transition-opacity group-hover:opacity-100">
+                  <div
+                    className="mt-3 flex items-center gap-1.5 text-xs text-accent opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-hidden
+                  >
                     <span>Open service</span>
                     <FiExternalLink className="h-3 w-3" />
                   </div>
                 )}
               </div>
-            </a>
+            </article>
           );
         })}
       </div>

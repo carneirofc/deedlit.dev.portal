@@ -13,7 +13,6 @@ const app: LocalServiceApp = {
   host: "a.deedlit.dev",
   url: "https://a.deedlit.dev",
   description: "",
-  status: "online",
   category: "other",
   icon: "generic",
   order: 0

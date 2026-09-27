@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { auth, sessionKey, signOut } from "@/auth";
 import { invalidatePortalSnapshot } from "@/features/services/server/snapshot";
+import type { RefreshState } from "@/features/services/types";
 import { rateLimit } from "@/lib/rate-limit";
 
 /** Refresh is the one action that deliberately bypasses the snapshot cache. */
@@ -20,9 +21,11 @@ const REFRESH_WINDOW_MS = 60_000;
  * needs its own limit: without one, holding the refresh button down is an
  * uncapped probe generator aimed at every service in the cluster. Over the
  * limit the action simply re-renders from cache — the page still updates, it
- * just does not re-probe.
+ * just does not re-probe, and the result says so.
+ *
+ * Shaped for `useActionState`, hence the unused previous state.
  */
-export async function refreshServices(): Promise<void> {
+export async function refreshServices(_previous: RefreshState): Promise<RefreshState> {
   const session = await auth();
   if (!session) redirect("/login?callbackUrl=/portal");
 
@@ -34,6 +37,7 @@ export async function refreshServices(): Promise<void> {
   if (limited.ok) invalidatePortalSnapshot();
 
   revalidatePath("/portal");
+  return { refreshed: limited.ok };
 }
 
 export async function signOutAction(): Promise<void> {

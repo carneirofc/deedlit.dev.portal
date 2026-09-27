@@ -429,7 +429,6 @@ export function toServiceApp(
     namespace,
     description:
       pickAnnotation(annotations, PORTAL_ANNOTATIONS.description) ?? `Ingress in ${namespace}.`,
-    status: "online",
     category: parseCategory(pickAnnotation(annotations, PORTAL_ANNOTATIONS.category)),
     icon: parseIcon(pickAnnotation(annotations, PORTAL_ANNOTATIONS.icon)),
     order: parseOrder(pickAnnotation(annotations, PORTAL_ANNOTATIONS.order)),
