@@ -21,9 +21,9 @@ import { localServiceApps } from "@/features/services/data/local-services";
  * adding a service to the portal is a values-file change in the infra repo —
  * no rebuild here.
  *
- * A single GET against one API group is the whole requirement, so this talks
- * to the apiserver with `fetch` rather than pulling in `@kubernetes/client-node`,
- * which would add megabytes to the standalone bundle for no gain.
+ * Two plain GETs are the whole requirement, so this talks to the apiserver
+ * with `node:https` rather than pulling in `@kubernetes/client-node`, which
+ * would add megabytes to the standalone bundle for no gain.
  *
  * The read surface is deliberately two verbs and nothing more: `list` on
  * label-selected Ingresses, and `get` on the individual Services those
@@ -105,6 +105,11 @@ async function readClusterCredentials(): Promise<{ token: string; ca: string } |
   }
 }
 
+/** `10.96.0.1` or `[::1]` — anything that is an address rather than a name. */
+function isIpLiteral(hostname: string): boolean {
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":");
+}
+
 /**
  * `fetch` has no way to pin a CA per request, and the apiserver certificate is
  * signed by the cluster's own root — so this one call drops to `node:https`
@@ -119,13 +124,7 @@ async function readClusterCredentials(): Promise<{ token: string; ca: string } |
  * make a "verified" connection readable. There is deliberately no way to turn
  * any of that off from configuration: an `AUTH_SKIP_TLS_VERIFY`-style escape
  * hatch is the one setting that reliably ends up true in production.
- */
-/** `10.96.0.1` or `[::1]` — anything that is an address rather than a name. */
-function isIpLiteral(hostname: string): boolean {
-  return /^\d{1,3}(\.\d{1,3}){3}$/.test(hostname) || hostname.includes(":");
-}
-
-/**
+ *
  * Settles exactly once, always, within `API_DEADLINE_MS`.
  *
  * Once a response has started, a peer reset or a mid-body close is reported

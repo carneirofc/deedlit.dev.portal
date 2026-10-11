@@ -4,7 +4,7 @@ import type { LocalServiceApp } from "@/features/services/types";
  * Development fallback for the service list.
  *
  * In the cluster the portal discovers these from Kubernetes Ingress objects
- * (see `../server/discover.ts`). This copy exists so `npm run dev:dev` renders
+ * (see `../server/discover.ts`). This copy exists so `npm run dev` renders
  * something realistic on a laptop, where there is no ServiceAccount token.
  *
  * These mirror the charts in `deedlit.dev.infra/apps/`. There are no
@@ -53,6 +53,16 @@ export const localServiceApps: LocalServiceApp[] = [
     order: 30
   },
   {
+    id: "adguardhome",
+    name: "AdGuard Home",
+    host: "adguard.deedlit.dev",
+    url: "https://adguard.deedlit.dev",
+    description: "DNS-level ad/tracker blocking and DoH resolver.",
+    category: "ops",
+    icon: "generic",
+    order: 35
+  },
+  {
     id: "keycloak",
     name: "Keycloak",
     host: "auth.deedlit.dev",
@@ -81,5 +91,15 @@ export const localServiceApps: LocalServiceApp[] = [
     category: "media",
     icon: "books",
     order: 51
+  },
+  {
+    id: "hermes",
+    name: "Hermes Agent",
+    host: "hermes.deedlit.dev",
+    url: "https://hermes.deedlit.dev",
+    description: "Self-hosted AI agent (Nous Research), backed by Anthropic.",
+    category: "workflow",
+    icon: "prompt",
+    order: 60
   }
 ];
