@@ -5,7 +5,7 @@
 # Trivy reports the finding again and the build goes red until someone looks.
 #
 # Before adding anything here, prefer the actual fix: bump the dependency, or
-# re-pin the base image digest in deedlit.dev/Dockerfile.
+# re-pin the base image digest in this repo's Dockerfile.
 
 vulnerabilities:
   # OpenSSL in the distroless runtime base. Debian has published 3.0.19/3.0.20,

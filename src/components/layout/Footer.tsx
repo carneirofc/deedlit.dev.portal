@@ -20,7 +20,7 @@ export function Footer() {
             Portal
           </a>
           <a
-            href="https://github.com/yourname/deedlit.dev"
+            href="https://github.com/carneirofc/deedlit.dev.portal"
             className="focus-ring rounded-md hover:text-text"
           >
             GitHub
