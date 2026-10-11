@@ -1,0 +1,90 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.14/schema.json",
+
+  // Carried over from the deedlit.dev monorepo's root biome.jsonc when the
+  // portal was split out. Keep the two in step where they overlap.
+
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!**/.next", "!**/out", "!**/next-env.d.ts", "!**/playwright-report", "!**/test-results"]
+  },
+
+  // Configured but not applied to the tree; reformatting belongs in its own commit.
+  "formatter": {
+    "enabled": true,
+    "useEditorconfig": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+
+  // Tailwind v4 directives (@source/@theme/@apply) are parse errors otherwise.
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      // Same demotions as the monorepo: eslint-config-next only had six a11y
+      // rules, as warnings, so these stay visible without failing CI.
+      "a11y": {
+        "useButtonType": "warn",
+        "noSvgWithoutTitle": "warn",
+        "noStaticElementInteractions": "warn",
+        "noLabelWithoutControl": "warn",
+        "noNoninteractiveElementToInteractiveRole": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useSemanticElements": "warn",
+        "useValidAnchor": "warn",
+        "useFocusableInteractive": "warn",
+        "useAnchorContent": "warn",
+        "noRedundantAlt": "warn"
+      },
+      "correctness": {
+        "useExhaustiveDependencies": "warn"
+      },
+      "style": {
+        "noNonNullAssertion": "warn"
+      },
+      "suspicious": {
+        "noArrayIndexKey": "warn"
+      }
+    },
+    "domains": {
+      "next": "recommended",
+      "react": "recommended"
+    }
+  },
+
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "off"
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      // Module augmentation (e.g. src/types/next-auth.d.ts) widens third-party types.
+      "includes": ["**/*.d.ts"],
+      "linter": { "rules": { "suspicious": { "noExplicitAny": "off" } } }
+    },
+    {
+      "includes": ["**/scripts/**", "**/*.config.{js,mjs,ts}", "**/postcss.config.js"],
+      "linter": { "rules": { "style": { "noCommonJs": "off" } } }
+    }
+  ]
+}

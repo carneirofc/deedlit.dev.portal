@@ -10,7 +10,6 @@
 @source "../features/**/*.{ts,tsx,js,jsx,mdx}";
 @source "../lib/**/*.{ts,tsx,js,jsx}";
 @source "@carneirofc/ui";
-@source "../../../deedlit.dev.ui/src/**/*.{ts,tsx,js,jsx}";
 
 /* Legacy app token aliases used by existing feature components. */
 :root {
