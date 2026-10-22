@@ -16,3 +16,6 @@ next-env.d.ts
 
 # local working notes (security review plans)
 docs/plans/
+
+# local agent tooling scaffolding (not project source)
+.claude/
