@@ -5,25 +5,39 @@ assets, and the authenticated `/portal` service dashboard (GitHub OAuth /
 generic OIDC). Deployed by `deedlit.dev.infra` at `portal.deedlit.dev`,
 reachable over the WireGuard tunnel only.
 
-Split out of the `deedlit.dev` monorepo (`carneirofc/deedlit.dev`) into its
-own repo. It consumes the shared component library `@carneirofc/ui` as a
-published GitHub Packages dependency — that package's source still lives in
-`deedlit.dev.ui` in the monorepo.
+Split out of the `deedlit.dev` monorepo into its own repo. The shared
+component library `@carneirofc/ui` (source: `deedlit.dev.ui/` in
+`carneirofc/deedlit.dev.ui`) is **vendored** as a packed tarball in
+`vendor/` and referenced with a `file:` dependency, so installs and image
+builds need no GitHub Packages token.
 
 ## Development
 
 ```bash
-npm install   # requires a GitHub Packages read token, see below
+npm ci        # no registry token needed
 npm run dev   # http://localhost:3001
 ```
 
-`@carneirofc/ui` is published under the `@carneirofc` scope on GitHub
-Packages, which requires authentication even for public packages. Add a
-token with `read:packages` scope to your user-level `~/.npmrc`:
+### Updating `@carneirofc/ui`
 
+Build the tarball from a release tag the same way `publish-ui.yml` does, then
+swap it in:
+
+```bash
+cd ../deedlit.dev.ui
+git worktree add --detach /tmp/ui vX.Y.Z && cd /tmp/ui
+npm ci --ignore-scripts
+npm version X.Y.Z --workspace @carneirofc/ui --no-git-tag-version --allow-same-version
+npm run build:ui
+npm pack --workspace @carneirofc/ui --pack-destination <portal>/vendor
+cd <portal>
+git rm vendor/carneirofc-ui-<old>.tgz
+# point package.json at file:vendor/carneirofc-ui-X.Y.Z.tgz
+npm install   # refreshes the integrity hash in package-lock.json
 ```
-//npm.pkg.github.com/:_authToken=<token>
-```
+
+Release tags newer than v1.2.0 use pnpm (`pnpm --filter @carneirofc/ui
+build` and `pnpm pack`). The steps are otherwise the same.
 
 Copy `.env.example` to `.env.local` and fill in the auth provider(s) you
 want to test against.
@@ -32,7 +46,7 @@ want to test against.
 
 ```bash
 npm run build
-DOCKER_BUILDKIT=1 docker build --secret id=npm_token,env=NODE_AUTH_TOKEN -t portal .
+docker build -t portal .
 ```
 
 See `AGENTS.md` for architecture, auth, and deployment details.

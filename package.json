@@ -15,7 +15,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@carneirofc/ui": "^1.2.0",
+    "@carneirofc/ui": "file:vendor/carneirofc-ui-1.2.0.tgz",
     "clsx": "^2.1.1",
     "next": "^16.3.0",
     "next-auth": "^5.0.0-beta.32",

@@ -1,10 +1,10 @@
 # Build context is this repo's root:
-#   DOCKER_BUILDKIT=1 docker build --secret id=npm_token,env=NODE_AUTH_TOKEN -t portal .
+#   docker build -t portal .
 #
-# `@carneirofc/ui` is consumed as a published GitHub Packages dependency, not
-# a monorepo sibling, so `npm ci` needs registry auth. The token is passed as
-# a BuildKit secret and only ever touches a throwaway `.npmrc` inside the
-# `deps` stage — it is never COPYed into a later stage or baked into a layer.
+# `@carneirofc/ui` is vendored as a packed tarball under vendor/ and referenced
+# with a file: dependency, so `npm ci` needs no registry credentials — every
+# other dependency comes from the public npm registry. The lockfile pins the
+# tarball's integrity hash, so a changed tarball fails the install.
 #
 # Both bases are pinned by digest. A floating tag is a supply-chain hole — it
 # lets whoever can write to the registry (or anyone who can intercept an
@@ -16,16 +16,15 @@
 FROM node:24-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS deps
 WORKDIR /app
 
-# Only the manifest, so this layer caches until a dependency actually changes.
+# Only the manifest and the vendored tarball, so this layer caches until a
+# dependency actually changes.
 COPY package.json package-lock.json ./
+COPY vendor/ ./vendor/
 
 # `--ignore-scripts` keeps install-time scripts out of the build. The lockfile
 # carries every platform's optional native binaries, so npm picks the Linux
 # ones here without any extra step.
-RUN --mount=type=secret,id=npm_token \
-    printf '@carneirofc:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=%s\n' "$(cat /run/secrets/npm_token)" > .npmrc \
- && npm ci --ignore-scripts --no-audit --no-fund \
- && rm -f .npmrc
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
 # ---- Stage 2: build --------------------------------------------------------
 FROM node:24-slim@sha256:3638d9a6fe4030bd716be989438248074489337ba3275657f93595428be4fc03 AS builder
