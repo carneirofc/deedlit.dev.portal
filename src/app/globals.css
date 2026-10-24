@@ -11,7 +11,7 @@
 @source "../lib/**/*.{ts,tsx,js,jsx}";
 @source "@carneirofc/ui";
 
-/* Legacy app token aliases used by existing feature components. */
+/* App token aliases (bg-base, text-muted, border-line, text-accent, ...). */
 :root {
   --base: 247 247 250;
   --surface: 255 255 255;
@@ -69,67 +69,3 @@ html {
     0 0 0 2px rgb(var(--base)),
     0 0 0 4px rgb(var(--accent));
 }
-
-.chip {
-  border: 1px solid rgb(var(--line) / 0.8);
-  border-radius: 9999px;
-  background: rgb(var(--surface) / 0.8);
-  color: rgb(var(--muted));
-  padding: 0.25rem 0.75rem;
-  font-size: 0.75rem;
-  backdrop-filter: blur(8px);
-  transition:
-    color 0.2s ease,
-    border-color 0.2s ease,
-    background-color 0.2s ease;
-}
-
-select {
-  background-image: none;
-}
-
-select option {
-  background-color: rgb(var(--surface));
-  color: rgb(var(--text));
-  padding: 0.5rem;
-}
-
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  border: none;
-  background: rgb(var(--accent));
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 1rem;
-  height: 1rem;
-  border: none;
-  border-radius: 50%;
-  background: rgb(var(--accent));
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: all 0.2s ease;
-}
-
-input[type="range"]::-moz-range-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
-}
-

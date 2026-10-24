@@ -24,7 +24,8 @@ import { logger } from "@/lib/logger";
 import { safeAuthRedirect } from "@/lib/safe-redirect";
 
 /**
- * Authentication for the private `/portal` area.
+ * Authentication for the whole app — every page and API route except the
+ * allow-list in `src/lib/public-paths.ts` requires a session.
  *
  * Sessions are JWT-only: the portal stores nothing per user, so adding a
  * database adapter would buy nothing and cost a datastore. Authorization is
@@ -158,6 +159,26 @@ export function stillAuthorized(token: JWT): boolean {
 }
 
 /**
+ * A human-readable account of which rule admitted this session, for the
+ * account page. Display only — the decision itself is `stillAuthorized()`,
+ * re-derived on every request; nothing reads this string back.
+ */
+export function describeAccess(token: JWT): string {
+  if (token.provider === GITHUB_PROVIDER_ID) {
+    const grant = token.githubGrant;
+    if (!grant) return "GitHub";
+    if (grant.via === "user") return "GitHub user allow-list";
+    return grant.team
+      ? `GitHub team ${grant.org}/${grant.team}`
+      : `GitHub organization ${grant.org}`;
+  }
+  if (token.provider === OIDC_PROVIDER_ID) {
+    return `${oidcDisplayName()} allow-list`;
+  }
+  return "Unknown";
+}
+
+/**
  * A stable per-account key for rate limiting. Derived from the session, whose
  * contents the client cannot rewrite, so a caller cannot escape their bucket
  * by changing anything they control. The subject is the provider's immutable
@@ -287,6 +308,9 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       }
       if (session.user && typeof token.subject === "string") {
         session.user.subject = token.subject;
+      }
+      if (session.user) {
+        session.user.access = describeAccess(token);
       }
       return session;
     }

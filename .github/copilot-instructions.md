@@ -1,40 +1,26 @@
-# Deedlit Landing App — Copilot Instructions
+# deedlit.dev.portal — Copilot Instructions
 
 ## What This Package Owns
-This package is the public-facing Next.js site for deedlit.dev. It handles the landing experience plus books, gallery presentation, project/service descriptions, and related content-driven routes.
+A private Next.js service portal: the signed-in services dashboard (`/`), the account page (`/account`), sign-in (`/login`) and the JSON view at `/api/portal/services`. There is no public content — every route needs a session except the allow-list in `src/lib/public-paths.ts`.
 
 ## Architecture
-- Use App Router patterns in `src/app/`.
+- App Router in `src/app/`. Signed-in pages live in the `(portal)` route group; its `layout.tsx` is the server-side session check and renders the shell.
 - Default to Server Components. Add `"use client"` only when state, effects, browser APIs, or direct event handling require it.
-- Keep features organized under `src/features/<feature>/` with collocated components, hooks, logic, data, and documentation when present.
-- Shared site-level components belong in `src/components/`; cross-feature utilities belong in `src/lib/`.
-- Use the `@/` alias for imports from `src/`.
+- Features under `src/features/<feature>/` (today only `services`); shared shell components in `src/components/`; cross-feature utilities in `src/lib/`. Use the `@/` alias.
 
-## Data And Content Workflows
-- Book metadata originates from the Goodreads scraping flow in `scripts/scrape-goodreads.ts` and feature data under `src/features/books/data/`.
-- Prefer updating source configuration or generated data inputs rather than hardcoding derived content in UI components.
-- Gallery and static content should remain easy to prerender and SEO-friendly.
+## Security Rules (do not weaken)
+- New routes are private by default. Making one public means adding it to `src/lib/public-paths.ts` with a reason and a test.
+- Every page calls `requireSession()`; every route handler and server action calls `auth()` and refuses without a session. Never rely on the proxy or a layout alone.
+- Never pass a raw `callbackUrl` to `redirect()` — use `safeCallbackUrl()`.
+- Inline scripts take the CSP nonce from `x-nonce`; never relax the CSP.
 
 ## Shared UI Rules
-- Reuse `@carneirofc/ui` before adding one-off primitives in this app.
-- Keep app-specific composition in this package, but move generic controls or reusable surfaces into `deedlit.dev.ui`.
-- Import the shared design language from `@carneirofc/ui` rather than creating conflicting styles.
-
-## PWA And Frontend Concerns
-- Keep service-worker and icon behavior consistent with the existing `public/` assets.
-- Avoid adding client-side complexity to pages that can stay server-rendered.
-- Preserve accessible markup and stable test selectors when introducing new interactive elements.
+- Reuse `@carneirofc/ui` before adding one-off primitives; promote generic controls into `deedlit.dev.ui`.
+- The kit's stylesheet overrides `font` on `button`/`input` without a layer, so font-size utilities there need the important modifier (`text-xs!`). `text-base` is a colour token in this app, not a size.
 
 ## Testing And Verification
-- This package exposes `npm run test:e2e`, but the current tree does not include committed Playwright spec files or config files. Treat old docs that refer to `e2e/` as historical unless the test files are reintroduced.
-- If Playwright tests are added back, prefer semantic locators first and stable `data-testid` attributes where semantic selectors are not enough.
-- Keep scraper or content-generation changes easy to verify from generated outputs.
-
-## Common Commands
-- Dev server: `npm run dev`
-- Production build: `npm run build`
-- Goodreads scrape: `npm run scrape-goodreads`
-- Playwright examples: `npm run playwright-examples`
+- `npm test` (Vitest) covers the security-critical rules and the dashboard summary logic; a fix to any of them ships with a test.
+- `npm run lint` (Biome), `npx tsc --noEmit`, `npm run build`.
 
 ## Change Boundaries
-- Do not vendor shared UI primitives into this app — promote them into `deedlit.dev.ui` (in the `deedlit.dev` monorepo) instead.
+- Service listings are cluster data: to add a service, annotate its Ingress in `deedlit.dev.infra`, not here.

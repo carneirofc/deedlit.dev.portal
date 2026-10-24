@@ -1,9 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { IBM_Plex_Mono, Sora } from "next/font/google";
-import { AppSidebar } from "@/components/layout/AppSidebar";
-import { ThemeToggleButton } from "@/components/layout/ThemeToggleButton";
-import { ServiceWorkerRegistration } from "@/components/pwa/ServiceWorkerRegistration";
 import "./globals.css";
 
 const themeInitScript = `
@@ -32,69 +29,15 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://deedlit.dev"),
   title: {
-    default: "deedlit.dev | Personal Space",
-    template: "%s | deedlit.dev"
+    default: "Service Portal | deedlit.dev",
+    template: "%s | deedlit.dev portal"
   },
-  description: "My personal space for AI-generated art, book collection, and creative projects. Featuring ComfyUI-generated images, organized book library, and hobby projects.",
-  keywords: ["ComfyUI", "AI art", "image generation", "book collection", "SDXL", "Flux", "creative projects", "personal library"],
-  authors: [{ name: "deedlit.dev" }],
-  creator: "deedlit.dev",
-  publisher: "deedlit.dev",
-  alternates: {
-    canonical: "/"
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
-  },
-  manifest: "/manifest.webmanifest",
-  applicationName: "deedlit.dev",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "deedlit.dev"
-  },
-  formatDetection: {
-    telephone: false
-  },
-  openGraph: {
-    type: "website",
-    url: "https://deedlit.dev",
-    title: "deedlit.dev - Personal Creative Space",
-    description: "AI-generated art gallery, book collection, and creative projects. ComfyUI images, organized library, and hobbies.",
-    siteName: "deedlit.dev",
-    locale: "en_US",
-    images: [
-      {
-        url: "/images/og-cover.svg",
-        width: 1200,
-        height: 630,
-        alt: "deedlit.dev - personal creative space preview"
-      }
-    ]
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "deedlit.dev - Personal Creative Space",
-    description: "AI-generated art, book collection, and creative projects.",
-    images: ["/images/og-cover.svg"],
-    creator: "@deedlit_dev"
-  },
-  verification: {
-    // Add verification tokens here when ready
-    // google: 'your-google-verification-code',
-    // yandex: 'your-yandex-verification-code',
-  },
-  category: "technology",
+  description: "Private dashboard for the deedlit.dev cluster's services.",
+  applicationName: "deedlit.dev portal",
+  // Every page is behind a session; nothing here belongs in an index.
+  robots: { index: false, follow: false },
+  formatDetection: { telephone: false }
 };
 
 export const viewport: Viewport = {
@@ -124,14 +67,9 @@ export default async function RootLayout({
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body
-        className={`${display.variable} ${mono.variable} font-[var(--font-display)] antialiased`}
+        className={`${display.variable} ${mono.variable} min-h-screen font-[var(--font-display)] antialiased`}
       >
-        <div className="min-h-screen px-1.5 py-3 pb-24 sm:px-6 sm:py-8 sm:pb-24 md:pl-24 md:pr-6 lg:px-8 lg:pl-24 2xl:px-12 2xl:pl-24">
-          <ThemeToggleButton />
-          <AppSidebar />
-          <ServiceWorkerRegistration />
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

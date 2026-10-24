@@ -54,8 +54,10 @@ export async function GET() {
       services: apps.map((app) => ({
         id: app.id,
         name: app.name,
+        description: app.description,
         host: app.host,
         url: app.url,
+        namespace: app.namespace,
         category: app.category,
         health: health[app.id] ?? { state: "unknown", checkedAt: new Date().toISOString() }
       }))

@@ -1,9 +1,9 @@
 # Services Feature
 
-Powers `/portal`, the authenticated dashboard listing the cluster's services
-and their health. Everything here is server-side; the only client code is the
-search box, the copy-to-clipboard buttons, the refresh button and the
-"checked N s ago" freshness label.
+Powers `/`, the signed-in dashboard listing the cluster's services and their
+health. Discovery and probing are server-side; the only client code is the
+search box and status filter, the copy-to-clipboard buttons, the refresh
+button and the "checked N s ago" freshness labels.
 
 ## Structure
 
@@ -12,7 +12,12 @@ search box, the copy-to-clipboard buttons, the refresh button and the
 | `server/discover.ts`          | Lists services from the Kubernetes API                    |
 | `server/health.ts`            | Probes each service in-cluster                            |
 | `server/snapshot.ts`          | Shared 15s snapshot; bounds the probe fan-out             |
-| `components/ServicesSection.tsx` | Renders the grid, freshness and the degraded banner   |
+| `lib/summary.ts`              | Counts, median latency, category grouping, filtering      |
+| `components/ServiceSummary.tsx` | The summary tiles (total / up / down / unknown / latency) |
+| `components/ServicesBoard.tsx` | Search, status filter, degraded banner, grouped grid     |
+| `components/ServiceCard.tsx`  | One service: status, host, namespace, probe, copy buttons |
+| `components/StatusPill.tsx`   | Up / down / unknown pill                                  |
+| `components/PortalGuide.tsx`  | The collapsible "How this page works" explainer           |
 | `components/RefreshButton.tsx` | Refresh with pending state and rate-limit feedback       |
 | `components/ServiceGlyph.tsx` | Icon lookup, with a `generic` fallback                    |
 | `data/local-services.ts`      | Development fallback when there is no cluster             |
@@ -87,7 +92,7 @@ timeout, so one dead service costs one timeout rather than N. Only the status
 line is used; the response body is cancelled, never buffered.
 
 Discovery and probing sit behind `server/snapshot.ts`, a 15-second per-process
-snapshot with in-flight coalescing. Rendering `/portal` costs one apiserver
+snapshot with in-flight coalescing. Rendering the dashboard costs one apiserver
 list plus one probe per service, so without it a signed-in user holding F5
 would turn one session into continuous traffic against every service in the
 cluster. Authentication is no defence there — the portal's entire audience is

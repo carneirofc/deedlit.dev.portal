@@ -19,6 +19,12 @@ declare module "next-auth" {
        * limits are counted against.
        */
       subject?: string;
+      /**
+       * Which rule admitted the session, e.g. "GitHub user allow-list".
+       * Display only — authorization is re-derived from the token on every
+       * request and never read back from this.
+       */
+      access?: string;
     } & DefaultSession["user"];
   }
 }

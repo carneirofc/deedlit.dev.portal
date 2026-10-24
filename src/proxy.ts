@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { buildContentSecurityPolicy, createNonce } from "@/lib/csp";
+import { isApiPath, isPublicPath } from "@/lib/public-paths";
 
 /**
  * Next 16 renamed `middleware.ts` to `proxy.ts` and moved it onto the Node
- * runtime. Three jobs here, all cheap:
+ * runtime. Two jobs here:
  *
- *  1. Block direct browsing of `/images/` (images are served through the
- *     `/image` route, which strips PNG metadata first).
+ *  1. Deny by default. Every route except the short allow-list in
+ *     `src/lib/public-paths.ts` needs a session: anonymous page requests are
+ *     sent to `/login`, anonymous API requests get a 401. This is the first
+ *     gate, not the only one — the `(portal)` layout and every route handler
+ *     and server action re-check the session server-side, so a matcher
+ *     mistake here degrades to a refusal one layer later, never to an open
+ *     route.
  *  2. Security headers, including a per-request CSP nonce (`src/lib/csp.ts`).
  *     The policy travels on the *request* as well as the response: Next
  *     parses the nonce out of the request's `Content-Security-Policy` header
@@ -15,12 +21,7 @@ import { buildContentSecurityPolicy, createNonce } from "@/lib/csp";
  *     layout reads `x-nonce` for its inline theme script. The browser enforces
  *     the response copy. Without the request copy, `'strict-dynamic'` blocks
  *     hydration and every client component is dead.
- *  3. An *optimistic* redirect of anonymous traffic away from `/portal`.
- *     This is UX, not security — `src/app/portal/layout.tsx` re-checks the
- *     session server-side, and that check is the real boundary.
  */
-
-const PROTECTED_PREFIX = "/portal";
 
 const SECURITY_HEADERS = {
   "X-Frame-Options": "DENY",
@@ -36,16 +37,13 @@ const SECURITY_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload"
+  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+  // Nothing on this host belongs in a search index, public routes included.
+  "X-Robots-Tag": "noindex, nofollow"
 } as const;
 
 export const proxy = auth((request) => {
-  const { pathname } = request.nextUrl;
-
-  // Direct access to the raw image directory stays closed.
-  if (pathname.startsWith("/images/")) {
-    return new NextResponse("Not found", { status: 404 });
-  }
+  const { pathname, search } = request.nextUrl;
 
   const nonce = createNonce();
   const csp = buildContentSecurityPolicy(nonce);
@@ -58,9 +56,19 @@ export const proxy = auth((request) => {
     return response;
   };
 
-  if (!request.auth && pathname.startsWith(PROTECTED_PREFIX)) {
+  if (!request.auth && !isPublicPath(pathname)) {
+    if (isApiPath(pathname)) {
+      return applyHeaders(
+        NextResponse.json(
+          { error: "Unauthorized" },
+          { status: 401, headers: { "Cache-Control": "no-store" } }
+        )
+      );
+    }
+
+    // `/login` re-validates this with `safeCallbackUrl()` before using it.
     const loginUrl = new URL("/login", request.nextUrl.origin);
-    loginUrl.searchParams.set("callbackUrl", pathname);
+    if (pathname !== "/") loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
     return applyHeaders(NextResponse.redirect(loginUrl));
   }
 
@@ -76,5 +84,9 @@ export const proxy = auth((request) => {
 });
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|manifest).*)"]
+  // Everything except hashed static bundles (client code, never data), the app
+  // icon, and the service-worker kill switch — `public/sw.js` has to stay
+  // fetchable without a session, or a browser that installed the old worker
+  // can never replace it.
+  matcher: ["/((?!_next/static/|icon\\.svg|favicon\\.ico|sw\\.js).*)"]
 };

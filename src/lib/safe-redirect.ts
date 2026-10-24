@@ -14,7 +14,7 @@
  * the value that reaches `redirect()` is the one that was checked.
  */
 
-export const CALLBACK_FALLBACK = "/portal";
+export const CALLBACK_FALLBACK = "/";
 
 /** A fixed, never-resolving origin to resolve candidates against. */
 const PROBE_ORIGIN = "http://callback.invalid";
@@ -55,20 +55,27 @@ export function sameOriginPath(raw: string | undefined | null): string | null {
   return path;
 }
 
-/** The only area `/login` ever legitimately returns someone to. */
-function isPortalPath(path: string): boolean {
+/**
+ * Pages `/login` may return someone to: any app page, but never back into
+ * `/login` itself (a loop) or into `/api/` — a callback there would turn
+ * sign-in into a one-click GET against a route handler such as
+ * `/api/auth/signout`.
+ */
+function isAppPage(path: string): boolean {
   const pathname = path.replace(/[?#].*$/, "");
-  return pathname === "/portal" || pathname.startsWith("/portal/");
+  if (pathname === "/login" || pathname.startsWith("/login/")) return false;
+  if (pathname === "/api" || pathname.startsWith("/api/")) return false;
+  return true;
 }
 
 /**
- * Where `/login` sends someone after sign-in. `/login` is only ever reached
- * from the portal, so anything outside `/portal` — even same-origin — falls
- * back rather than becoming a redirect gadget.
+ * Where `/login` sends someone after sign-in. Anything that is not a
+ * same-origin app page falls back to the dashboard rather than becoming a
+ * redirect gadget.
  */
 export function safeCallbackUrl(raw: string | undefined | null): string {
   const path = sameOriginPath(raw);
-  return path && isPortalPath(path) ? path : CALLBACK_FALLBACK;
+  return path && isAppPage(path) ? path : CALLBACK_FALLBACK;
 }
 
 /**

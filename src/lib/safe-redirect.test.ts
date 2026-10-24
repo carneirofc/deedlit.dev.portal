@@ -14,30 +14,41 @@ describe("safeCallbackUrl", () => {
     ["javascript: URL", "javascript:alert(1)"],
     ["encoded slashes", "/%2F%2Fevil.example"],
     ["triple slash", "///evil.example"],
-    ["relative path", "portal"],
-    ["same-origin but outside the portal", "/api/auth/signout"],
-    ["prefix lookalike", "/portalevil"],
-    ["null byte", "/portal\u0000"],
-    // The parser would strip this tab and yield `/portal/x`; it is refused
+    ["relative path", "account"],
+    ["a route handler", "/api/auth/signout"],
+    ["the api root", "/api"],
+    ["a dot-segment climb into the api", "/account/../api/portal/services"],
+    ["the login page", "/login"],
+    ["the login page with a query", "/login?callbackUrl=/account"],
+    ["null byte", "/account\u0000"],
+    // The parser would strip this tab and yield `/account/x`; it is refused
     // anyway, because nothing honest needs one.
-    ["tab inside a portal path", "/portal/\tx"],
-    ["overlong", `/portal/${"a".repeat(3000)}`]
+    ["tab inside a path", "/account/\tx"],
+    ["overlong", `/account/${"a".repeat(3000)}`]
   ])("falls back on %s", (_label, raw) => {
     expect(safeCallbackUrl(raw)).toBe(CALLBACK_FALLBACK);
   });
 
-  it("falls back on a missing value", () => {
-    expect(safeCallbackUrl(undefined)).toBe("/portal");
-    expect(safeCallbackUrl("")).toBe("/portal");
+  it("falls back to the dashboard on a missing value", () => {
+    expect(CALLBACK_FALLBACK).toBe("/");
+    expect(safeCallbackUrl(undefined)).toBe("/");
+    expect(safeCallbackUrl("")).toBe("/");
   });
 
-  it("preserves a portal path, query and hash exactly", () => {
-    expect(safeCallbackUrl("/portal?x=1#y")).toBe("/portal?x=1#y");
-    expect(safeCallbackUrl("/portal/services")).toBe("/portal/services");
+  it("preserves an app path, query and hash exactly", () => {
+    expect(safeCallbackUrl("/account?x=1#y")).toBe("/account?x=1#y");
+    expect(safeCallbackUrl("/?q=registry")).toBe("/?q=registry");
+    // Old bookmarks: next.config redirects these to `/` after sign-in.
+    expect(safeCallbackUrl("/portal")).toBe("/portal");
+  });
+
+  it("does not treat a lookalike prefix as /login or /api", () => {
+    expect(safeCallbackUrl("/loginx")).toBe("/loginx");
+    expect(safeCallbackUrl("/apis")).toBe("/apis");
   });
 
   it("returns the re-serialised path, not the raw input", () => {
-    expect(safeCallbackUrl("/portal/./a/../b")).toBe("/portal/b");
+    expect(safeCallbackUrl("/account/./a/../b")).toBe("/account/b");
   });
 });
 
@@ -56,17 +67,17 @@ describe("safeAuthRedirect", () => {
   const base = "https://portal.deedlit.dev";
 
   it("keeps same-origin relative and absolute targets", () => {
-    expect(safeAuthRedirect("/portal", base)).toBe(`${base}/portal`);
+    expect(safeAuthRedirect("/account", base)).toBe(`${base}/account`);
     expect(safeAuthRedirect("/", base)).toBe(`${base}/`);
-    expect(safeAuthRedirect(`${base}/portal?x=1`, base)).toBe(`${base}/portal?x=1`);
+    expect(safeAuthRedirect(`${base}/account?x=1`, base)).toBe(`${base}/account?x=1`);
   });
 
   it.each([
-    "https://evil.example/portal",
+    "https://evil.example/account",
     "//evil.example",
     "/\t/evil.example",
     "https://portal.deedlit.dev.evil.example/",
-    "http://portal.deedlit.dev/portal",
+    "http://portal.deedlit.dev/account",
     "javascript:alert(1)",
     "not a url"
   ])("sends %s to the base URL", (url) => {
