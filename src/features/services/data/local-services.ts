@@ -66,7 +66,16 @@ export const localServiceApps: LocalServiceApp[] = [
     id: "keycloak",
     name: "Keycloak",
     host: "auth.deedlit.dev",
-    url: "https://auth.deedlit.dev",
+    // The public Ingress routes only the realm paths; the bare host is a 404.
+    url: "https://auth.deedlit.dev/realms/deedlit/account",
+    links: [
+      { label: "OIDC issuer", url: "https://auth.deedlit.dev/realms/deedlit" },
+      {
+        label: "OIDC discovery",
+        url: "https://auth.deedlit.dev/realms/deedlit/.well-known/openid-configuration"
+      },
+      { label: "Admin console (WireGuard)", url: "https://auth-admin.deedlit.dev/admin/" }
+    ],
     description: "Identity provider (OIDC).",
     category: "auth",
     icon: "idp",

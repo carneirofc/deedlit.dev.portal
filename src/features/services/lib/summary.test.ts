@@ -80,6 +80,18 @@ describe("filterServices", () => {
     expect(filterServices(apps, health, "", "down").map((a) => a.id)).toEqual(["bookorbit"]);
     expect(filterServices(apps, health, "", "unknown")).toEqual([]);
   });
+
+  it("matches the label of an extra card link", () => {
+    const withLinks = [
+      ...apps,
+      app("keycloak", {
+        links: [{ label: "OIDC issuer", url: "https://keycloak.deedlit.dev/realms/deedlit" }]
+      })
+    ];
+    expect(filterServices(withLinks, health, "oidc issuer", "all").map((a) => a.id)).toEqual([
+      "keycloak"
+    ]);
+  });
 });
 
 describe("groupByCategory", () => {

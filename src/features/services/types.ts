@@ -46,11 +46,24 @@ export const SERVICE_CATEGORIES: readonly ServiceCategory[] = [
   "other"
 ];
 
+/**
+ * An extra address a card advertises besides its main link — e.g. an OIDC
+ * issuer URL to paste into a client, or an admin console on another host.
+ */
+export interface ServiceLink {
+  label: string;
+  /** Absolute `https://` URL, already validated against the allowed hosts. */
+  url: string;
+}
+
 export interface LocalServiceApp {
   id: string;
   name: string;
   host: string;
+  /** Where the card's title links: `https://<host>` plus `portal.deedlit.dev/path`. */
   url: string;
+  /** Extra addresses from `portal.deedlit.dev/links`; absent when there are none. */
+  links?: ServiceLink[];
   description: string;
   /** Namespace of the Ingress it was discovered from; absent for the static list. */
   namespace?: string;
@@ -115,5 +128,9 @@ export const PORTAL_ANNOTATIONS = {
   icon: "portal.deedlit.dev/icon",
   healthPath: "portal.deedlit.dev/health-path",
   healthPort: "portal.deedlit.dev/health-port",
-  order: "portal.deedlit.dev/order"
+  order: "portal.deedlit.dev/order",
+  /** Path appended to the host for the card's main link (default: none). */
+  path: "portal.deedlit.dev/path",
+  /** JSON array of `{ "label", "url" }`; `url` is a path on the host or an https URL. */
+  links: "portal.deedlit.dev/links"
 } as const;

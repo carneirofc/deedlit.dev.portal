@@ -86,7 +86,8 @@ export function filterServices(
       app.namespace ?? "",
       app.category,
       CATEGORY_LABEL[app.category] ?? "",
-      app.description
+      app.description,
+      ...(app.links ?? []).map((link) => link.label)
     ]
       .join(" ")
       .toLowerCase();

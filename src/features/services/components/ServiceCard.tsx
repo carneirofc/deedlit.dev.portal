@@ -4,6 +4,7 @@ import { FiExternalLink, FiLink } from "react-icons/fi";
 import { CopyIcon } from "@carneirofc/ui";
 import { RelativeTime } from "@/components/RelativeTime";
 import { ServiceGlyph } from "@/features/services/components/ServiceGlyph";
+import { ServiceLinks } from "@/features/services/components/ServiceLinks";
 import { StatusPill } from "@/features/services/components/StatusPill";
 import type { HealthState, LocalServiceApp, ServiceHealth } from "@/features/services/types";
 
@@ -96,6 +97,8 @@ export function ServiceCard({ app, health, onCopy }: ServiceCardProps) {
             </>
           )}
         </dl>
+
+        <ServiceLinks serviceName={app.name} links={app.links} onCopy={onCopy} />
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-3">
           <span
