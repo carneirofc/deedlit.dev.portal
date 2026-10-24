@@ -6,34 +6,10 @@
 #
 # Before adding anything here, prefer the actual fix: bump the dependency, or
 # re-pin the base image digest in this repo's Dockerfile.
+#
+# Empty. The OpenSSL exceptions (CVE-2026-31789, -28387..-28390, -45447)
+# expired on 2026-09-15 with no fixed nodejs24-debian12 distroless build ever
+# published (still libssl3 3.0.18-1~deb12u2). They were cleared by moving the
+# runtime to nodejs24-debian13 (libssl3t64 3.5.7-1~deb13u3) instead.
 
-vulnerabilities:
-  # OpenSSL in the distroless runtime base. Debian has published 3.0.19/3.0.20,
-  # but no distroless nodejs24-debian12 rebuild carrying them exists yet, so
-  # there is no digest to move to — this is "wait", not "ignore".
-  #
-  # Node in this base links libssl dynamically, so these do reach the TLS the
-  # app uses for the GitHub and Kubernetes APIs. Both of those are outbound to
-  # known hosts with pinned/again-verified certificates, which is the narrowest
-  # exposure available; it is not zero.
-  #
-  # To clear: re-pull gcr.io/distroless/nodejs24-debian12:nonroot, confirm
-  # libssl3 >= 3.0.20-1~deb12u2, and update the digest in the Dockerfile.
-  - id: CVE-2026-31789
-    expired_at: 2026-09-15
-    statement: No fixed distroless nodejs24-debian12 build published yet.
-  - id: CVE-2026-28387
-    expired_at: 2026-09-15
-    statement: No fixed distroless nodejs24-debian12 build published yet.
-  - id: CVE-2026-28388
-    expired_at: 2026-09-15
-    statement: No fixed distroless nodejs24-debian12 build published yet.
-  - id: CVE-2026-28389
-    expired_at: 2026-09-15
-    statement: No fixed distroless nodejs24-debian12 build published yet.
-  - id: CVE-2026-28390
-    expired_at: 2026-09-15
-    statement: No fixed distroless nodejs24-debian12 build published yet.
-  - id: CVE-2026-45447
-    expired_at: 2026-09-15
-    statement: No fixed distroless nodejs24-debian12 build published yet.
+vulnerabilities: []

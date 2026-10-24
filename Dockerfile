@@ -53,7 +53,7 @@ RUN rm -rf .next/standalone/node_modules/typescript \
 # undici, brace-expansion, ip-address). A server that only runs
 # `node server.js` needs none of it, and the absent shell removes the usual
 # post-exploitation foothold.
-FROM gcr.io/distroless/nodejs24-debian12@sha256:14d42e2511532589a7c7e01a753667a74fcc96266e137e8125006b87b0c32d0a AS runner
+FROM gcr.io/distroless/nodejs24-debian13@sha256:15ad6c1f53346336ebdd06b6752f8f92ecf2f1dff5948e8f99d6aac737eb26dd AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \
