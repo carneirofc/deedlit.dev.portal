@@ -130,6 +130,33 @@ ingress:
     portal.deedlit.dev/health-path: /v2/
 ```
 
+### Card links: `path` and `links`
+
+A card's title links to `https://<host>` unless the Ingress says otherwise.
+Two optional annotations cover services whose bare host is not the useful
+address, or that have more than one address worth showing:
+
+- `portal.deedlit.dev/path`: a path appended to the host for the main link.
+  Keycloak needs it: its public Ingress routes only the realm paths, so
+  `https://auth.deedlit.dev/` is a Traefik 404 by design.
+- `portal.deedlit.dev/links`: a JSON array of `{ "label", "url" }`, rendered
+  under the card with open and copy buttons (`components/ServiceLinks.tsx`). A
+  `url` is either a path on the card's host or an `https://` URL on an allowed
+  host.
+
+```yaml
+    portal.deedlit.dev/path: /realms/deedlit/account
+    portal.deedlit.dev/links: >-
+      [{"label": "OIDC issuer", "url": "/realms/deedlit"},
+       {"label": "Admin console (WireGuard)", "url": "https://auth-admin.deedlit.dev/admin/"}]
+```
+
+Both are validated in `server/discover.ts`. A bad `path` falls back to the bare
+host. A bad link entry (no label, a non-`https` scheme, credentials, an
+explicit port, or a host outside `PORTAL_ALLOWED_HOST_SUFFIXES`) is dropped and
+logged, and malformed JSON drops them all. Labels are capped at 48 characters
+with control characters stripped, and a card shows at most 8 links.
+
 To add a new **icon**, extend `ServiceIcon` and `SERVICE_ICONS` in `types.ts`
 and add the glyph to `ServiceGlyph.tsx`. Unknown values fall back to `generic`
 rather than rendering an empty card.
@@ -143,7 +170,8 @@ the portal.* Three things narrow what that principal can do:
 
 - Only hosts under `PORTAL_ALLOWED_HOST_SUFFIXES` (default `deedlit.dev`,
   matched on a label boundary, wildcards refused) become cards, so a card
-  cannot point off-domain.
+  cannot point off-domain. Extra card links (`portal.deedlit.dev/links`) are
+  held to the same list.
 - Two Ingresses claiming one host produce one card (the first listed); the
   collision is logged with both namespaces.
 - Each card shows its namespace, so one that does not belong is visible.

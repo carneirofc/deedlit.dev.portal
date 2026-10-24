@@ -7,8 +7,12 @@ import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalServiceApp } from "@/features/services/types";
 import {
+  cardUrl,
   dedupeByHost,
   getJson,
+  MAX_SERVICE_LINKS,
+  parseLinks,
+  resolveLinkUrl,
   isAllowedHost,
   isValidDnsLabel,
   parseHealthPath,
@@ -93,6 +97,39 @@ describe("toServiceApp", () => {
     expect(app?.namespace).toBe("zot");
   });
 
+  it("keeps the bare-host URL and omits links when neither is annotated", () => {
+    const app = toServiceApp(ingress(), new Map());
+    expect(app?.url).toBe("https://registry.deedlit.dev");
+    expect(app).not.toHaveProperty("links");
+  });
+
+  it("applies portal.deedlit.dev/path and /links (Keycloak's real annotations)", () => {
+    const app = toServiceApp(
+      ingress({
+        host: "auth.deedlit.dev",
+        annotations: {
+          "portal.deedlit.dev/path": "/realms/deedlit/account",
+          "portal.deedlit.dev/links": JSON.stringify([
+            { label: "OIDC issuer", url: "/realms/deedlit" },
+            { label: "OIDC discovery", url: "/realms/deedlit/.well-known/openid-configuration" },
+            { label: "Admin console (WireGuard)", url: "https://auth-admin.deedlit.dev/admin/" }
+          ])
+        }
+      }),
+      new Map()
+    );
+
+    expect(app?.url).toBe("https://auth.deedlit.dev/realms/deedlit/account");
+    expect(app?.links).toEqual([
+      { label: "OIDC issuer", url: "https://auth.deedlit.dev/realms/deedlit" },
+      {
+        label: "OIDC discovery",
+        url: "https://auth.deedlit.dev/realms/deedlit/.well-known/openid-configuration"
+      },
+      { label: "Admin console (WireGuard)", url: "https://auth-admin.deedlit.dev/admin/" }
+    ]);
+  });
+
   it("drops an Ingress whose host is off the allowed domain", () => {
     expect(toServiceApp(ingress({ host: "keycloak-login.evil.example" }), new Map())).toBeNull();
   });
@@ -101,6 +138,93 @@ describe("toServiceApp", () => {
     vi.stubEnv("PORTAL_ALLOWED_HOST_SUFFIXES", "example.org, .lan");
     expect(toServiceApp(ingress({ host: "nas.lan" }), new Map())).not.toBeNull();
     expect(toServiceApp(ingress({ host: "registry.deedlit.dev" }), new Map())).toBeNull();
+  });
+});
+
+describe("cardUrl", () => {
+  it("is the bare host without a path", () => {
+    expect(cardUrl("auth.deedlit.dev", undefined)).toBe("https://auth.deedlit.dev");
+    expect(cardUrl("auth.deedlit.dev", "/")).toBe("https://auth.deedlit.dev");
+  });
+
+  it("appends a valid path", () => {
+    expect(cardUrl("auth.deedlit.dev", "/realms/deedlit/account")).toBe(
+      "https://auth.deedlit.dev/realms/deedlit/account"
+    );
+  });
+
+  it.each(["//evil.example", "/../x", "https://evil.example", "x"])(
+    "keeps the bare host for %s",
+    (raw) => {
+      expect(cardUrl("auth.deedlit.dev", raw)).toBe("https://auth.deedlit.dev");
+    }
+  );
+});
+
+describe("resolveLinkUrl", () => {
+  const suffixes = ["deedlit.dev"];
+
+  it("resolves a path against the card host", () => {
+    expect(resolveLinkUrl("/realms/deedlit", "auth.deedlit.dev", suffixes)).toBe(
+      "https://auth.deedlit.dev/realms/deedlit"
+    );
+  });
+
+  it("accepts an https URL on an allowed host", () => {
+    expect(resolveLinkUrl("https://auth-admin.deedlit.dev/admin/", "auth.deedlit.dev", suffixes)).toBe(
+      "https://auth-admin.deedlit.dev/admin/"
+    );
+  });
+
+  it.each([
+    "http://auth-admin.deedlit.dev/",
+    "https://evil.example/",
+    "https://xdeedlit.dev/",
+    "https://user:pw@auth.deedlit.dev/",
+    "https://auth.deedlit.dev:8443/",
+    "javascript:alert(1)",
+    "//evil.example/x",
+    "/../x",
+    "not a url"
+  ])("refuses %s", (raw) => {
+    expect(resolveLinkUrl(raw, "auth.deedlit.dev", suffixes)).toBeNull();
+  });
+});
+
+describe("parseLinks", () => {
+  const suffixes = ["deedlit.dev"];
+  const parse = (raw: string | undefined) => parseLinks(raw, "auth.deedlit.dev", suffixes, "ns/ing");
+
+  it("returns nothing for absent, malformed or non-array input", () => {
+    expect(parse(undefined)).toEqual([]);
+    expect(parse("{not json")).toEqual([]);
+    expect(parse('{"label":"x","url":"/x"}')).toEqual([]);
+  });
+
+  it("keeps valid entries and drops bad ones", () => {
+    const raw = JSON.stringify([
+      { label: "OIDC issuer", url: "/realms/deedlit" },
+      { label: "Phish", url: "https://evil.example/" },
+      { label: "", url: "/x" },
+      { url: "/x" },
+      null,
+      { label: "Admin", url: "https://auth-admin.deedlit.dev/admin/" }
+    ]);
+    expect(parse(raw)).toEqual([
+      { label: "OIDC issuer", url: "https://auth.deedlit.dev/realms/deedlit" },
+      { label: "Admin", url: "https://auth-admin.deedlit.dev/admin/" }
+    ]);
+  });
+
+  it("strips control characters and caps the label length", () => {
+    const [link] = parse(JSON.stringify([{ label: ` a\u0000b\n${"c".repeat(80)}`, url: "/x" }]));
+    expect(link.label.startsWith("ab")).toBe(true);
+    expect(link.label).toHaveLength(48);
+  });
+
+  it(`keeps at most ${MAX_SERVICE_LINKS} links`, () => {
+    const raw = JSON.stringify(Array.from({ length: 12 }, (_, i) => ({ label: `L${i}`, url: `/p${i}` })));
+    expect(parse(raw)).toHaveLength(MAX_SERVICE_LINKS);
   });
 });
 

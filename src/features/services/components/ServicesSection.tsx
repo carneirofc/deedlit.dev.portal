@@ -13,6 +13,7 @@ import {
 } from "@carneirofc/ui";
 import { RefreshButton } from "@/features/services/components/RefreshButton";
 import { ServiceGlyph } from "@/features/services/components/ServiceGlyph";
+import { ServiceLinks } from "@/features/services/components/ServiceLinks";
 import type {
   DiscoveryFailure,
   LocalServiceApp,
@@ -120,7 +121,11 @@ export function ServicesSection({
     if (!needle) return apps;
 
     return apps.filter((app) =>
-      `${app.name} ${app.host} ${app.category} ${app.description}`.toLowerCase().includes(needle)
+      `${app.name} ${app.host} ${app.category} ${app.description} ${(app.links ?? [])
+        .map((link) => link.label)
+        .join(" ")}`
+        .toLowerCase()
+        .includes(needle)
     );
   }, [apps, query]);
 
@@ -304,6 +309,8 @@ export function ServicesSection({
                     </OutlineButton>
                   </div>
                 </div>
+
+                <ServiceLinks serviceName={app.name} links={app.links} onCopy={copyValue} />
 
                 {isUp && (
                   <div

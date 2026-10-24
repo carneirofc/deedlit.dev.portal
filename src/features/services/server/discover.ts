@@ -9,7 +9,8 @@ import {
   type DiscoveryFailure,
   type LocalServiceApp,
   type ServiceCategory,
-  type ServiceIcon
+  type ServiceIcon,
+  type ServiceLink
 } from "@/features/services/types";
 import { localServiceApps } from "@/features/services/data/local-services";
 
@@ -376,6 +377,108 @@ export function isAllowedHost(host: string, suffixes: string[]): boolean {
   return suffixes.some((suffix) => name === suffix || name.endsWith(`.${suffix}`));
 }
 
+/** Upper bound on extra links per card; the rest are dropped with a warning. */
+export const MAX_SERVICE_LINKS = 8;
+const MAX_LINK_LABEL = 48;
+
+/**
+ * The card's main link: `https://<host>` plus an optional path. Some services
+ * answer nothing useful at `/` — Keycloak's public Ingress routes only its
+ * realm paths, so the bare host is a Traefik 404 — and the path is how a card
+ * points somewhere that works. Validated like the health path; an invalid
+ * value keeps the bare host rather than half-applying.
+ */
+export function cardUrl(host: string, rawPath: string | undefined): string {
+  const path = rawPath && parseHealthPath(rawPath) === rawPath ? rawPath : "/";
+  return path === "/" ? `https://${host}` : `https://${host}${path}`;
+}
+
+/**
+ * Resolves one link target. A path is taken relative to the card's own host;
+ * anything else must be an `https:` URL with no credentials and no explicit
+ * port, on a host that would itself be allowed to publish a card. A link is a
+ * card's address in miniature, so it gets the same off-domain protection.
+ */
+export function resolveLinkUrl(
+  raw: string,
+  host: string,
+  hostSuffixes: string[]
+): string | null {
+  if (raw.startsWith("/")) {
+    return parseHealthPath(raw) === raw ? `https://${host}${raw}` : null;
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+
+  if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port) {
+    return null;
+  }
+  if (!isAllowedHost(parsed.hostname, hostSuffixes)) return null;
+  return parsed.toString();
+}
+
+function cleanLabel(raw: string): string {
+  const printable = [...raw].filter((char) => {
+    const code = char.charCodeAt(0);
+    return code > 0x1f && code !== 0x7f;
+  });
+  return printable.join("").trim().slice(0, MAX_LINK_LABEL);
+}
+
+/**
+ * Reads `portal.deedlit.dev/links`: a JSON array of `{ "label", "url" }`.
+ * Malformed JSON yields no links; individual bad entries are dropped. Labels
+ * are plain text (rendered, never interpreted) but still trimmed, length-capped
+ * and stripped of control characters.
+ */
+export function parseLinks(
+  raw: string | undefined,
+  host: string,
+  hostSuffixes: string[],
+  context: string
+): ServiceLink[] {
+  if (!raw) return [];
+
+  let entries: unknown;
+  try {
+    entries = JSON.parse(raw);
+  } catch {
+    logger.warn("Portal links ignored: annotation is not valid JSON", { ingress: context });
+    return [];
+  }
+  if (!Array.isArray(entries)) {
+    logger.warn("Portal links ignored: annotation is not a JSON array", { ingress: context });
+    return [];
+  }
+
+  const links: ServiceLink[] = [];
+  for (const entry of entries) {
+    if (links.length >= MAX_SERVICE_LINKS) {
+      logger.warn("Portal links truncated", { ingress: context, max: MAX_SERVICE_LINKS });
+      break;
+    }
+
+    const { label: rawLabel, url: rawUrl } = (entry ?? {}) as { label?: unknown; url?: unknown };
+    const label = typeof rawLabel === "string" ? cleanLabel(rawLabel) : "";
+    const url = typeof rawUrl === "string" ? resolveLinkUrl(rawUrl.trim(), host, hostSuffixes) : null;
+
+    if (!label || !url) {
+      logger.warn("Portal link dropped: needs a label and a path or allowed https URL", {
+        ingress: context
+      });
+      continue;
+    }
+    links.push({ label, url });
+  }
+
+  return links;
+}
+
 export function toServiceApp(
   item: NonNullable<IngressListResponse["items"]>[number],
   portLookup: PortLookup,
@@ -420,11 +523,19 @@ export function toServiceApp(
         )}`
       : undefined;
 
+  const links = parseLinks(
+    pickAnnotation(annotations, PORTAL_ANNOTATIONS.links),
+    host,
+    hostSuffixes,
+    `${namespace}/${ingressName}`
+  );
+
   return {
     id: item.metadata?.uid ?? `${namespace}/${ingressName}`,
     name: pickAnnotation(annotations, PORTAL_ANNOTATIONS.name) ?? ingressName,
     host,
-    url: `https://${host}`,
+    url: cardUrl(host, pickAnnotation(annotations, PORTAL_ANNOTATIONS.path)),
+    ...(links.length ? { links } : {}),
     namespace,
     description:
       pickAnnotation(annotations, PORTAL_ANNOTATIONS.description) ?? `Ingress in ${namespace}.`,
