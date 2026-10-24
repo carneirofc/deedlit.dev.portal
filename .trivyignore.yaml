@@ -9,7 +9,8 @@
 #
 # Empty. The OpenSSL exceptions (CVE-2026-31789, -28387..-28390, -45447)
 # expired on 2026-09-15 with no fixed nodejs24-debian12 distroless build ever
-# published (still libssl3 3.0.18-1~deb12u2). They were cleared by moving the
-# runtime to nodejs24-debian13 (libssl3t64 3.5.7-1~deb13u3) instead.
+# published (still libssl3 3.0.18-1~deb12u2). They were cleared by moving off
+# Debian entirely: the runtime is now a chiselled Ubuntu 26.04 root with no
+# system OpenSSL at all (Node bundles its own).
 
 vulnerabilities: []
