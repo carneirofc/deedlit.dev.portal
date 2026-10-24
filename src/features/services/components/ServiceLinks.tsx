@@ -1,14 +1,14 @@
 "use client";
 
 import { FiExternalLink } from "react-icons/fi";
-import { CopyIcon, OutlineButton } from "@carneirofc/ui";
+import { CopyIcon } from "@carneirofc/ui";
 import type { ServiceLink } from "@/features/services/types";
 
 interface ServiceLinksProps {
   serviceName: string;
   links: ServiceLink[] | undefined;
   /** Copies a value and reports it; the card owns the "Copied" message. */
-  onCopy: (value: string) => void;
+  onCopy: (value: string, what: string) => void;
 }
 
 /**
@@ -39,15 +39,15 @@ export function ServiceLinks({ serviceName, links, onCopy }: ServiceLinksProps) 
             <span className="truncate">{link.label}</span>
             <FiExternalLink className="h-3 w-3 shrink-0" aria-hidden />
           </a>
-          <OutlineButton
+          <button
             type="button"
-            controlSize="icon"
-            onClick={() => onCopy(link.url)}
+            onClick={() => onCopy(link.url, `${link.label} URL`)}
             title={`Copy ${link.label} URL`}
             aria-label={`Copy ${link.label} URL of ${serviceName}`}
+            className="focus-ring grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line/70 text-muted transition hover:border-accent/50 hover:text-accent"
           >
             <CopyIcon size="h-3 w-3" />
-          </OutlineButton>
+          </button>
         </li>
       ))}
     </ul>
