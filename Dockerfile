@@ -11,7 +11,8 @@
 # tarball's integrity hash, so a changed tarball fails the install.
 #
 # Supply chain: every input is pinned to content, never to a mutable name.
-#   - The Ubuntu base by digest. Refresh with:
+#   - The Ubuntu base by digest, written out in both FROM lines (keep them
+#     identical; an ARG in FROM trips older hadolint as DL3006). Refresh with:
 #       docker pull ubuntu:26.04 && docker inspect --format '{{index .RepoDigests 0}}' ubuntu:26.04
 #   - Node by the sha256 of the official linux-x64 tarball. Take it from
 #     https://nodejs.org/dist/vX.Y.Z/SHASUMS256.txt after checking that file's
@@ -19,13 +20,12 @@
 #       gpgv --keyring ./pubring.kbx SHASUMS256.txt.sig SHASUMS256.txt
 #   - chisel by the sha384 its GitHub release publishes, and the slice
 #     definitions (canonical/chisel-releases) by commit.
-ARG UBUNTU_IMAGE=docker.io/library/ubuntu:26.04@sha256:42527649dbc4f9197a6073f426f488cbff0e9cc9f2afce32d91c383e4875634a
 
 # ---- Stage 0: Ubuntu + the official Node build ------------------------------
 # Ubuntu's own nodejs package is not Node 24, and Canonical publishes no
 # Node 24 rock, so Node comes from nodejs.org. Its binaries bundle OpenSSL,
 # ICU and the CA store, and link only glibc, libstdc++ and libgcc_s.
-FROM ${UBUNTU_IMAGE} AS node
+FROM docker.io/library/ubuntu:26.04@sha256:42527649dbc4f9197a6073f426f488cbff0e9cc9f2afce32d91c383e4875634a AS node
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG NODE_VERSION=24.22.1
 ARG NODE_SHA256=6c172a9ab6718f7b801fb5a7bd486af2ee5e32758086a04b84fcce2aa77095e6
@@ -86,7 +86,7 @@ RUN rm -rf .next/standalone/node_modules/typescript \
 # therefore gets a dpkg status.d entry built from its real control file, the
 # way distroless images record theirs. The deb is re-downloaded at the exact
 # version chisel recorded, and its sha256 must match the manifest's.
-FROM ${UBUNTU_IMAGE} AS rootfs
+FROM docker.io/library/ubuntu:26.04@sha256:42527649dbc4f9197a6073f426f488cbff0e9cc9f2afce32d91c383e4875634a AS rootfs
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 ARG CHISEL_VERSION=v1.5.1
 ARG CHISEL_SHA384=89612f46de83e850aae11fca26a32a22cc2964891f2cc538211b906787d2b83e4496fa203a5074e06a9932f1fbe84a73
