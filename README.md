@@ -1,8 +1,9 @@
 # deedlit.dev.portal
 
-Public-facing Next.js site for deedlit.dev: home, books shelf, image
-gallery, PWA assets, and the authenticated `/portal` service dashboard
-(GitHub OAuth / generic OIDC).
+Next.js site for deedlit.dev: home, books shelf, image gallery, PWA
+assets, and the authenticated `/portal` service dashboard (GitHub OAuth /
+generic OIDC). Deployed by `deedlit.dev.infra` at `portal.deedlit.dev`,
+reachable over the WireGuard tunnel only.
 
 Split out of the `deedlit.dev` monorepo (`carneirofc/deedlit.dev`) into its
 own repo. It consumes the shared component library `@carneirofc/ui` as a
