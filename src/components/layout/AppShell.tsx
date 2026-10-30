@@ -1,9 +1,10 @@
 import type { Session } from "next-auth";
 import Link from "next/link";
-import { FiGithub, FiLogOut, FiShield } from "react-icons/fi";
+import { FiGithub, FiLoader, FiLogOut, FiShield } from "react-icons/fi";
 import { signOutAction } from "@/app/actions";
 import { NavLinks } from "@/components/layout/NavLinks";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 
 export function initials(user: Session["user"]): string {
   const source = user?.name || user?.username || user?.email || "?";
@@ -52,14 +53,16 @@ export function AppShell({ user, children }: { user: Session["user"]; children: 
             </Link>
             <ThemeToggle />
             <form action={signOutAction}>
-              <button
-                type="submit"
+              <PendingSubmitButton
                 title="Sign out"
                 aria-label="Sign out"
                 className="focus-ring grid h-9 w-9 place-items-center rounded-lg border border-line/70 text-muted transition hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-rose-400 motion-safe:active:scale-95"
+                pendingChildren={
+                  <FiLoader className="h-4 w-4 motion-safe:animate-spin" aria-hidden />
+                }
               >
                 <FiLogOut className="h-4 w-4" aria-hidden />
-              </button>
+              </PendingSubmitButton>
             </form>
           </div>
         </div>

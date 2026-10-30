@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { FiGithub, FiLock, FiShield } from "react-icons/fi";
+import { FiGithub, FiLoader, FiLock, FiShield } from "react-icons/fi";
 import { StatusBanner } from "@carneirofc/ui";
 import { auth, signIn, signInProviders } from "@/auth";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { clientKey, rateLimit, SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS } from "@/lib/rate-limit";
 import { safeCallbackUrl } from "@/lib/safe-redirect";
 
@@ -118,9 +119,14 @@ export default async function LoginPage({
               {providers.map((provider) => (
                 <form action={startSignIn} key={provider.id}>
                   <input type="hidden" name="provider" value={provider.id} />
-                  <button
-                    type="submit"
+                  <PendingSubmitButton
                     className="focus-ring flex w-full items-center justify-center gap-2 rounded-lg border border-line/80 bg-base/60 px-4 py-2.5 text-sm! font-medium transition hover:border-accent/60 hover:bg-accent/10 hover:text-accent motion-safe:active:scale-[0.98]"
+                    pendingChildren={
+                      <>
+                        <FiLoader className="h-4 w-4 motion-safe:animate-spin" aria-hidden />
+                        Redirecting to {provider.label}…
+                      </>
+                    }
                   >
                     {provider.id === "github" ? (
                       <FiGithub className="h-4 w-4" aria-hidden />
@@ -128,7 +134,7 @@ export default async function LoginPage({
                       <FiShield className="h-4 w-4" aria-hidden />
                     )}
                     {provider.label}
-                  </button>
+                  </PendingSubmitButton>
                 </form>
               ))}
             </div>

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import { FiGithub, FiLogOut, FiShield } from "react-icons/fi";
+import { FiGithub, FiLoader, FiLogOut, FiShield } from "react-icons/fi";
 import { KeyValueField } from "@carneirofc/ui";
 import { signOutAction } from "@/app/actions";
 import { initials } from "@/components/layout/AppShell";
+import { PendingSubmitButton } from "@/components/PendingSubmitButton";
 import { requireSession } from "@/lib/auth/require-session";
 
 export const metadata: Metadata = { title: "Account" };
@@ -46,13 +47,18 @@ export default async function AccountPage() {
             </p>
           </div>
           <form action={signOutAction} className="ml-auto">
-            <button
-              type="submit"
+            <PendingSubmitButton
               className="focus-ring flex items-center gap-2 rounded-lg border border-line/70 px-3 py-1.5 text-sm! text-muted transition hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-rose-400 motion-safe:active:scale-[0.97]"
+              pendingChildren={
+                <>
+                  <FiLoader className="h-4 w-4 motion-safe:animate-spin" aria-hidden />
+                  Signing out…
+                </>
+              }
             >
               <FiLogOut className="h-4 w-4" aria-hidden />
               Sign out
-            </button>
+            </PendingSubmitButton>
           </form>
         </div>
 
