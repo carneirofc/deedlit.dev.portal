@@ -3,9 +3,11 @@
 import { FiExternalLink, FiLink } from "react-icons/fi";
 import { CopyIcon } from "@carneirofc/ui";
 import { RelativeTime } from "@/components/RelativeTime";
+import { CopyValueButton } from "@/features/services/components/CopyValueButton";
 import { ServiceGlyph } from "@/features/services/components/ServiceGlyph";
 import { ServiceLinks } from "@/features/services/components/ServiceLinks";
 import { StatusPill } from "@/features/services/components/StatusPill";
+import { type CopyFeedback, copyStatusFor } from "@/features/services/lib/copy-feedback";
 import type { HealthState, LocalServiceApp, ServiceHealth } from "@/features/services/types";
 
 const STATUS_BAR: Record<HealthState, string> = {
@@ -18,6 +20,8 @@ interface ServiceCardProps {
   app: LocalServiceApp;
   health: ServiceHealth | undefined;
   onCopy: (value: string, what: string) => void;
+  /** The board's latest copy result; each button shows it only if it is its own. */
+  copyFeedback: CopyFeedback | null;
 }
 
 /**
@@ -26,7 +30,7 @@ interface ServiceCardProps {
  * after:inset-0`); the copy buttons sit above that overlay, so each control is
  * reached, announced and clicked on its own.
  */
-export function ServiceCard({ app, health, onCopy }: ServiceCardProps) {
+export function ServiceCard({ app, health, onCopy, copyFeedback }: ServiceCardProps) {
   const state = health?.state ?? "unknown";
   const isDown = state === "down";
 
@@ -98,7 +102,12 @@ export function ServiceCard({ app, health, onCopy }: ServiceCardProps) {
           )}
         </dl>
 
-        <ServiceLinks serviceName={app.name} links={app.links} onCopy={onCopy} />
+        <ServiceLinks
+          serviceName={app.name}
+          links={app.links}
+          onCopy={onCopy}
+          copyFeedback={copyFeedback}
+        />
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-3">
           <span
@@ -108,24 +117,24 @@ export function ServiceCard({ app, health, onCopy }: ServiceCardProps) {
             Open <FiExternalLink className="h-3 w-3" />
           </span>
           <div className="relative z-10 flex shrink-0 gap-1.5">
-            <button
-              type="button"
-              onClick={() => onCopy(app.host, "hostname")}
-              title="Copy hostname"
-              aria-label={`Copy hostname of ${app.name}`}
-              className="focus-ring grid h-7 w-7 place-items-center rounded-md border border-line/70 text-muted transition hover:border-accent/50 hover:text-accent"
-            >
-              <CopyIcon size="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => onCopy(app.url, "URL")}
-              title="Copy URL"
-              aria-label={`Copy URL of ${app.name}`}
-              className="focus-ring grid h-7 w-7 place-items-center rounded-md border border-line/70 text-muted transition hover:border-accent/50 hover:text-accent"
-            >
-              <FiLink className="h-3.5 w-3.5" />
-            </button>
+            <CopyValueButton
+              value={app.host}
+              what="hostname"
+              serviceName={app.name}
+              icon={CopyIcon}
+              size="md"
+              status={copyStatusFor(copyFeedback, app.host, "hostname")}
+              onCopy={onCopy}
+            />
+            <CopyValueButton
+              value={app.url}
+              what="URL"
+              serviceName={app.name}
+              icon={FiLink}
+              size="md"
+              status={copyStatusFor(copyFeedback, app.url, "URL")}
+              onCopy={onCopy}
+            />
           </div>
         </div>
       </div>

@@ -2,13 +2,17 @@
 
 import { FiExternalLink } from "react-icons/fi";
 import { CopyIcon } from "@carneirofc/ui";
+import { CopyValueButton } from "@/features/services/components/CopyValueButton";
+import { type CopyFeedback, copyStatusFor } from "@/features/services/lib/copy-feedback";
 import type { ServiceLink } from "@/features/services/types";
 
 interface ServiceLinksProps {
   serviceName: string;
   links: ServiceLink[] | undefined;
-  /** Copies a value and reports it; the card owns the "Copied" message. */
+  /** Copies a value and reports it; the board owns the feedback. */
   onCopy: (value: string, what: string) => void;
+  /** The board's latest copy result; each button shows it only if it is its own. */
+  copyFeedback: CopyFeedback | null;
 }
 
 /**
@@ -19,7 +23,7 @@ interface ServiceLinksProps {
  * `relative z-10` to stay clickable above that overlay — drop it into any card
  * that follows the same pattern. Renders nothing when there are no links.
  */
-export function ServiceLinks({ serviceName, links, onCopy }: ServiceLinksProps) {
+export function ServiceLinks({ serviceName, links, onCopy, copyFeedback }: ServiceLinksProps) {
   if (!links?.length) return null;
 
   return (
@@ -39,15 +43,15 @@ export function ServiceLinks({ serviceName, links, onCopy }: ServiceLinksProps) 
             <span className="truncate">{link.label}</span>
             <FiExternalLink className="h-3 w-3 shrink-0" aria-hidden />
           </a>
-          <button
-            type="button"
-            onClick={() => onCopy(link.url, `${link.label} URL`)}
-            title={`Copy ${link.label} URL`}
-            aria-label={`Copy ${link.label} URL of ${serviceName}`}
-            className="focus-ring grid h-6 w-6 shrink-0 place-items-center rounded-md border border-line/70 text-muted transition hover:border-accent/50 hover:text-accent"
-          >
-            <CopyIcon size="h-3 w-3" />
-          </button>
+          <CopyValueButton
+            value={link.url}
+            what={`${link.label} URL`}
+            serviceName={serviceName}
+            icon={CopyIcon}
+            size="sm"
+            status={copyStatusFor(copyFeedback, link.url, `${link.label} URL`)}
+            onCopy={onCopy}
+          />
         </li>
       ))}
     </ul>

@@ -7,6 +7,11 @@ import { RelativeTime } from "@/components/RelativeTime";
 import { RefreshButton } from "@/features/services/components/RefreshButton";
 import { ServiceCard } from "@/features/services/components/ServiceCard";
 import {
+  COPY_FEEDBACK_MS,
+  type CopyFeedback,
+  copyToClipboard
+} from "@/features/services/lib/copy-feedback";
+import {
   filterServices,
   groupByCategory,
   type StatusFilter,
@@ -37,8 +42,6 @@ const FAILURE_LABEL: Record<DiscoveryFailure, string> = {
   "invalid-response": "the Kubernetes API returned an unreadable response"
 };
 
-const COPY_MESSAGE_MS = 2_000;
-
 /**
  * Search, status filter and the grouped grid.
  *
@@ -56,7 +59,7 @@ export function ServicesBoard({
 }: ServicesBoardProps) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [copyState, setCopyState] = useState("");
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedback | null>(null);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(copyTimer.current), []);
@@ -69,16 +72,13 @@ export function ServicesBoard({
   const shown = groups.reduce((sum, group) => sum + group.apps.length, 0);
 
   // The copy buttons are siblings of the card's link, not inside it, so a
-  // click here can never also open the service.
+  // click here can never also open the service. One result at a time: a new
+  // copy replaces the last one, on its own button, and restarts the timer.
   const copyValue = async (value: string, what: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyState(`Copied ${what}: ${value}`);
-    } catch {
-      setCopyState("Clipboard unavailable");
-    }
+    const feedback = await copyToClipboard(value, what, navigator.clipboard);
+    setCopyFeedback(feedback);
     clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopyState(""), COPY_MESSAGE_MS);
+    copyTimer.current = setTimeout(() => setCopyFeedback(null), COPY_FEEDBACK_MS);
   };
 
   const statusOptions: { value: StatusFilter; label: string }[] = [
@@ -139,8 +139,11 @@ export function ServicesBoard({
         </div>
       </div>
 
-      <p className="min-h-4 text-xs text-emerald-500" aria-live="polite">
-        {copyState}
+      <p
+        className={`min-h-4 text-xs ${copyFeedback?.status === "failed" ? "text-rose-500" : "text-emerald-500"}`}
+        aria-live="polite"
+      >
+        {copyFeedback?.message}
       </p>
 
       {degraded && (
@@ -192,7 +195,13 @@ export function ServicesBoard({
           </h3>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {group.apps.map((app) => (
-              <ServiceCard key={app.id} app={app} health={health[app.id]} onCopy={copyValue} />
+              <ServiceCard
+                key={app.id}
+                app={app}
+                health={health[app.id]}
+                onCopy={copyValue}
+                copyFeedback={copyFeedback}
+              />
             ))}
           </div>
         </section>
