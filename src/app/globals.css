@@ -42,6 +42,7 @@ html[data-theme="dark"],
   --color-accent: rgb(var(--accent));
   --color-accent-soft: rgb(var(--accent-soft));
   --shadow-soft: 0 10px 30px rgba(6, 8, 18, 0.24);
+  --shadow-lift: 0 16px 40px rgba(6, 8, 18, 0.32);
   --radius-xl2: 1.25rem;
 }
 

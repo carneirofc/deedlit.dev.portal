@@ -36,7 +36,7 @@ export function ServiceCard({ app, health, onCopy, copyFeedback }: ServiceCardPr
 
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden rounded-xl2 border bg-surface/75 shadow-soft transition-all duration-200 focus-within:border-accent/50 hover:border-accent/50 hover:bg-surface hover:shadow-md motion-safe:hover:-translate-y-0.5 ${
+      className={`group relative flex flex-col overflow-hidden rounded-xl2 border bg-surface/75 shadow-soft transition-all duration-200 focus-within:border-accent/50 hover:border-accent/50 hover:bg-surface hover:shadow-lift motion-safe:hover:-translate-y-0.5 ${
         isDown ? "border-rose-500/40" : "border-line/80"
       }`}
     >
