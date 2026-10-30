@@ -27,6 +27,8 @@ function SubmitButton() {
       disabled={pending}
       aria-busy={pending}
       title="Re-run the health checks"
+      // Busy, not forbidden: overrides OutlineButton's `disabled:cursor-not-allowed`.
+      className="disabled:cursor-progress"
     >
       <FiRefreshCw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} aria-hidden />
       {pending ? "Refreshing…" : "Refresh"}

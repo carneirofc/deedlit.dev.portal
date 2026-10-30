@@ -61,6 +61,16 @@ html {
   }
 }
 
+/* Tailwind v4's preflight dropped v3's `button { cursor: pointer }`, leaving
+   buttons on the browser default arrow. This is the documented v4 migration
+   rule; layered, so a `cursor-*` utility on an element still wins. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
 /* .section-anchor + animation utilities promoted to @carneirofc/ui styles.css */
 
 .focus-ring:focus-visible {

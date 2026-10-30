@@ -39,7 +39,7 @@ export function ThemeToggle() {
       disabled={theme === null}
       aria-label={label}
       title={label}
-      className="focus-ring grid h-9 w-9 place-items-center rounded-lg border border-line/70 text-muted transition hover:border-accent/50 hover:text-text disabled:opacity-50"
+      className="focus-ring grid h-9 w-9 place-items-center rounded-lg border border-line/70 text-muted transition hover:border-accent/50 hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
     >
       {theme === "dark" ? (
         <FiSun className="h-4 w-4" aria-hidden />
