@@ -30,7 +30,7 @@ function SubmitButton() {
       // Busy, not forbidden: overrides OutlineButton's `disabled:cursor-not-allowed`.
       className="disabled:cursor-progress"
     >
-      <FiRefreshCw className={`h-3.5 w-3.5 ${pending ? "animate-spin" : ""}`} aria-hidden />
+      <FiRefreshCw className={`h-3.5 w-3.5 ${pending ? "motion-safe:animate-spin" : ""}`} aria-hidden />
       {pending ? "Refreshing…" : "Refresh"}
     </OutlineButton>
   );

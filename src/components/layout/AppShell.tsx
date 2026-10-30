@@ -24,8 +24,8 @@ export function AppShell({ user, children }: { user: Session["user"]; children: 
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-40 border-b border-line/60 bg-base/80 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="focus-ring flex items-center gap-2 rounded-md">
-            <span className="grid h-8 w-8 place-items-center rounded-lg border border-accent/40 bg-accent/10 text-xs font-semibold tracking-wider text-accent">
+          <Link href="/" className="group/logo focus-ring flex items-center gap-2 rounded-md">
+            <span className="grid h-8 w-8 place-items-center rounded-lg border border-accent/40 bg-accent/10 text-xs font-semibold tracking-wider text-accent transition-colors group-hover/logo:border-accent/70 group-hover/logo:bg-accent/20">
               DL
             </span>
             <span className="leading-tight">
@@ -41,7 +41,7 @@ export function AppShell({ user, children }: { user: Session["user"]; children: 
           <div className="ml-auto flex items-center gap-2">
             <Link
               href="/account"
-              className="focus-ring hidden items-center gap-2 rounded-lg border border-line/70 px-2 py-1 text-xs text-muted transition hover:border-accent/50 hover:text-text sm:flex"
+              className="focus-ring hidden items-center gap-2 rounded-lg border border-line/70 px-2 py-1 text-xs text-muted transition hover:border-accent/50 hover:bg-accent/5 hover:text-text motion-safe:active:scale-[0.97] sm:flex"
               title="Account details"
             >
               <span className="grid h-6 w-6 place-items-center rounded-md bg-accent/15 text-[10px] font-semibold text-accent">
@@ -56,7 +56,7 @@ export function AppShell({ user, children }: { user: Session["user"]; children: 
                 type="submit"
                 title="Sign out"
                 aria-label="Sign out"
-                className="focus-ring grid h-9 w-9 place-items-center rounded-lg border border-line/70 text-muted transition hover:border-rose-400/60 hover:text-rose-400"
+                className="focus-ring grid h-9 w-9 place-items-center rounded-lg border border-line/70 text-muted transition hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-rose-400 motion-safe:active:scale-95"
               >
                 <FiLogOut className="h-4 w-4" aria-hidden />
               </button>
@@ -77,7 +77,7 @@ export function AppShell({ user, children }: { user: Session["user"]; children: 
             href="https://github.com/carneirofc/deedlit.dev.portal"
             target="_blank"
             rel="noreferrer"
-            className="focus-ring rounded hover:text-text"
+            className="focus-ring rounded transition-colors hover:text-text"
           >
             source
           </a>

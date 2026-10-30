@@ -38,7 +38,7 @@ export function ServiceLinks({ serviceName, links, onCopy, copyFeedback }: Servi
             target="_blank"
             rel="noreferrer"
             title={link.url}
-            className="focus-ring inline-flex min-w-0 items-center gap-1 rounded-sm text-xs text-muted hover:text-accent"
+            className="focus-ring inline-flex min-w-0 items-center gap-1 rounded-sm text-xs text-muted transition-colors hover:text-accent"
           >
             <span className="truncate">{link.label}</span>
             <FiExternalLink className="h-3 w-3 shrink-0" aria-hidden />

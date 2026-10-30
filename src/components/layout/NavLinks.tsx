@@ -21,7 +21,7 @@ export function NavLinks() {
             key={href}
             href={href}
             aria-current={active ? "page" : undefined}
-            className={`focus-ring flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition ${
+            className={`focus-ring flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition motion-safe:active:scale-[0.97] ${
               active
                 ? "bg-accent/15 font-semibold text-accent"
                 : "text-muted hover:bg-surface hover:text-text"

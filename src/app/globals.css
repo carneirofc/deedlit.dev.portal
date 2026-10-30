@@ -59,6 +59,14 @@ html {
   html {
     scroll-behavior: auto;
   }
+
+  /* @carneirofc/ui's OutlineButton lifts on hover and shrinks on press with
+     no reduced-motion guard. Its translate/scale are layered utilities, so
+     this unlayered rule wins. */
+  [data-slot="button"] {
+    translate: none;
+    scale: none;
+  }
 }
 
 /* Tailwind v4's preflight dropped v3's `button { cursor: pointer }`, leaving

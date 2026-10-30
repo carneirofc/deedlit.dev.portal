@@ -24,7 +24,7 @@ function Code({ children }: { children: React.ReactNode }) {
 export function PortalGuide() {
   return (
     <details className="group rounded-xl border border-line/70 bg-surface/60 p-4 open:pb-5">
-      <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 rounded text-sm font-semibold">
+      <summary className="focus-ring flex cursor-pointer list-none items-center gap-2 rounded text-sm font-semibold transition-colors hover:text-accent">
         <FiBookOpen className="h-4 w-4 text-accent" aria-hidden />
         How this page works
         <span className="ml-auto text-xs font-normal text-muted group-open:hidden">show</span>

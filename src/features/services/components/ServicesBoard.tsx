@@ -106,7 +106,7 @@ export function ServicesBoard({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by name, host, namespace or category"
-            className="focus-ring w-full rounded-lg border border-line/70 bg-base/60 py-2 pl-9 pr-3 text-sm! placeholder:text-muted/70"
+            className="focus-ring w-full rounded-lg border border-line/70 bg-base/60 py-2 pl-9 pr-3 text-sm! placeholder:text-muted/70 hover:border-accent/40"
           />
         </label>
         <fieldset className="flex flex-wrap gap-1">
@@ -117,10 +117,10 @@ export function ServicesBoard({
               type="button"
               aria-pressed={status === option.value}
               onClick={() => setStatus(option.value)}
-              className={`focus-ring rounded-lg border px-3 py-1.5 text-xs! font-medium tabular-nums transition ${
+              className={`focus-ring rounded-lg border px-3 py-1.5 text-xs! font-medium tabular-nums transition motion-safe:active:scale-[0.97] ${
                 status === option.value
-                  ? "border-accent/60 bg-accent/15 text-accent"
-                  : "border-line/70 text-muted hover:border-accent/40 hover:text-text"
+                  ? "border-accent/60 bg-accent/15 text-accent hover:bg-accent/20"
+                  : "border-line/70 text-muted hover:border-accent/40 hover:bg-accent/5 hover:text-text"
               }`}
             >
               {option.label}
@@ -173,7 +173,7 @@ export function ServicesBoard({
           Nothing matches the current filter.{" "}
           <button
             type="button"
-            className="focus-ring rounded text-sm! text-accent underline-offset-2 hover:underline"
+            className="focus-ring rounded text-sm! text-accent underline-offset-2 hover:underline active:opacity-70"
             onClick={() => {
               setQuery("");
               setStatus("all");

@@ -48,7 +48,7 @@ export default async function AccountPage() {
           <form action={signOutAction} className="ml-auto">
             <button
               type="submit"
-              className="focus-ring flex items-center gap-2 rounded-lg border border-line/70 px-3 py-1.5 text-sm! text-muted transition hover:border-rose-400/60 hover:text-rose-400"
+              className="focus-ring flex items-center gap-2 rounded-lg border border-line/70 px-3 py-1.5 text-sm! text-muted transition hover:border-rose-400/60 hover:bg-rose-500/10 hover:text-rose-400 motion-safe:active:scale-[0.97]"
             >
               <FiLogOut className="h-4 w-4" aria-hidden />
               Sign out

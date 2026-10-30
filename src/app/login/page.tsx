@@ -120,7 +120,7 @@ export default async function LoginPage({
                   <input type="hidden" name="provider" value={provider.id} />
                   <button
                     type="submit"
-                    className="focus-ring flex w-full items-center justify-center gap-2 rounded-lg border border-line/80 bg-base/60 px-4 py-2.5 text-sm! font-medium transition hover:border-accent/60 hover:bg-accent/10 hover:text-accent"
+                    className="focus-ring flex w-full items-center justify-center gap-2 rounded-lg border border-line/80 bg-base/60 px-4 py-2.5 text-sm! font-medium transition hover:border-accent/60 hover:bg-accent/10 hover:text-accent motion-safe:active:scale-[0.98]"
                   >
                     {provider.id === "github" ? (
                       <FiGithub className="h-4 w-4" aria-hidden />

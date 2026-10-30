@@ -36,7 +36,7 @@ export function ServiceCard({ app, health, onCopy, copyFeedback }: ServiceCardPr
 
   return (
     <article
-      className={`group relative flex flex-col overflow-hidden rounded-xl2 border bg-surface/75 shadow-soft transition-all duration-200 focus-within:border-accent/50 hover:border-accent/50 hover:bg-surface hover:shadow-md ${
+      className={`group relative flex flex-col overflow-hidden rounded-xl2 border bg-surface/75 shadow-soft transition-all duration-200 focus-within:border-accent/50 hover:border-accent/50 hover:bg-surface hover:shadow-md motion-safe:hover:-translate-y-0.5 ${
         isDown ? "border-rose-500/40" : "border-line/80"
       }`}
     >
@@ -111,7 +111,7 @@ export function ServiceCard({ app, health, onCopy, copyFeedback }: ServiceCardPr
 
         <div className="mt-auto flex items-center justify-between gap-2 pt-3">
           <span
-            className="flex items-center gap-1.5 text-xs text-accent opacity-0 transition-opacity group-hover:opacity-100"
+            className="flex items-center gap-1.5 text-xs text-accent opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
             aria-hidden
           >
             Open <FiExternalLink className="h-3 w-3" />
