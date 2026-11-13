@@ -140,10 +140,6 @@ export default async function LoginPage({
             </div>
           )}
         </section>
-
-        <p className="mt-4 text-center text-xs text-muted">
-          Reachable over the WireGuard tunnel only. Sessions end after 8 hours idle.
-        </p>
       </div>
     </main>
   );
