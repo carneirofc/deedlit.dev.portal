@@ -78,7 +78,7 @@ describe("clientAddress", () => {
           headers({ "cf-connecting-ip": "203.0.113.7", "x-forwarded-for": "1.2.3.4, 10.42.0.9" })
         )
       ).toBe("cf:203.0.113.7");
-      expect(clientAddress(headers({ "cf-connecting-ip": "2001:db8::1" }))).toBe("cf:2001:db8::1");
+      expect(clientAddress(headers({ "cf-connecting-ip": "2001:db8::1" }))).toBe("cf:2001:db8:0:0::/64");
     });
 
     it("gives two tunnel clients separate keys even though XFF's last hop is shared", async () => {
@@ -122,5 +122,43 @@ describe("clientAddress", () => {
     const { clientAddress } = await load();
 
     expect(clientAddress(headers({}))).toBe("unknown");
+  });
+});
+
+describe("addressKey", () => {
+  it("keeps IPv4 addresses whole", async () => {
+    const { addressKey } = await load();
+    expect(addressKey("203.0.113.7")).toBe("203.0.113.7");
+  });
+
+  it("counts every address in one IPv6 /64 as the same client", async () => {
+    const { addressKey } = await load();
+
+    const a = addressKey("2001:db8:1:2:aaaa:bbbb:cccc:dddd");
+    expect(addressKey("2001:db8:1:2::1")).toBe(a);
+    expect(addressKey("2001:0DB8:0001:0002:ffff:0:0:1")).toBe(a);
+    expect(a).toBe("2001:db8:1:2::/64");
+  });
+
+  it("keeps different /64s apart", async () => {
+    const { addressKey } = await load();
+    expect(addressKey("2001:db8:1:2::1")).not.toBe(addressKey("2001:db8:1:3::1"));
+  });
+
+  it("handles compressed forms and v4-mapped addresses", async () => {
+    const { addressKey } = await load();
+
+    expect(addressKey("::1")).toBe("0:0:0:0::/64");
+    expect(addressKey("2001:db8::")).toBe("2001:db8:0:0::/64");
+    expect(addressKey("::ffff:198.51.100.4")).toBe("198.51.100.4");
+  });
+
+  it("buckets a rotating IPv6 client together on the public path", async () => {
+    vi.stubEnv("PORTAL_ALLOW_PUBLIC_EDGE", "true");
+    const { clientAddress } = await load();
+    const key = (ip: string) => clientAddress(new Headers({ "cf-connecting-ip": ip }));
+
+    expect(key("2001:db8:5:6::1")).toBe(key("2001:db8:5:6:dead:beef:0:42"));
+    vi.unstubAllEnvs();
   });
 });

@@ -1,4 +1,4 @@
-import { isIP } from "node:net";
+import { isIP, isIPv6 } from "node:net";
 import { headers } from "next/headers";
 import { allowsPublicEdge } from "@/lib/edge";
 
@@ -123,12 +123,43 @@ export const ANONYMOUS_WINDOW_MS = 60_000;
 export function clientAddress(requestHeaders: Headers): string {
   if (allowsPublicEdge()) {
     const cloudflare = requestHeaders.get("cf-connecting-ip")?.trim();
-    if (cloudflare && isIP(cloudflare)) return `cf:${cloudflare}`;
+    if (cloudflare && isIP(cloudflare)) return `cf:${addressKey(cloudflare)}`;
   }
 
   const forwarded = requestHeaders.get("x-forwarded-for");
   const entries = forwarded?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
-  return entries.at(-1) ?? "unknown";
+  const last = entries.at(-1);
+  return last ? addressKey(last) : "unknown";
+}
+
+/**
+ * The unit a client is counted as. An IPv4 address is one client. An IPv6
+ * address is not: a single subscriber is routinely handed a whole /64 (2^64
+ * addresses) and can pick a fresh one per request, so keying on the full
+ * address lets anyone with ordinary home IPv6 escape every per-client limit.
+ * The /64 is the smallest prefix one end site is expected to hold, so that is
+ * the key. Anything that is not an IPv6 literal is returned as is.
+ */
+export function addressKey(address: string): string {
+  if (!isIPv6(address)) return address;
+
+  // Embedded IPv4 (::ffff:1.2.3.4) is an IPv4 client in disguise.
+  const mapped = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(address);
+  if (mapped) return mapped[1];
+
+  const [head, tail = ""] = address.toLowerCase().split("::");
+  const headGroups = head ? head.split(":") : [];
+  const tailGroups = tail ? tail.split(":") : [];
+  const missing = 8 - headGroups.length - tailGroups.length;
+  const groups = address.includes("::")
+    ? [...headGroups, ...Array(Math.max(missing, 0)).fill("0"), ...tailGroups]
+    : headGroups;
+
+  const prefix = groups
+    .slice(0, 4)
+    .map((group) => Number.parseInt(group, 16).toString(16))
+    .join(":");
+  return `${prefix}::/64`;
 }
 
 /** A rate-limit key for the current request, which has no session yet. */
