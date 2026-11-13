@@ -42,6 +42,7 @@ html[data-theme="dark"],
   --color-accent: rgb(var(--accent));
   --color-accent-soft: rgb(var(--accent-soft));
   --shadow-soft: 0 10px 30px rgba(6, 8, 18, 0.24);
+  --shadow-lift: 0 16px 40px rgba(6, 8, 18, 0.32);
   --radius-xl2: 1.25rem;
 }
 
@@ -58,6 +59,24 @@ html {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+
+  /* @carneirofc/ui's OutlineButton lifts on hover and shrinks on press with
+     no reduced-motion guard. Its translate/scale are layered utilities, so
+     this unlayered rule wins. */
+  [data-slot="button"] {
+    translate: none;
+    scale: none;
+  }
+}
+
+/* Tailwind v4's preflight dropped v3's `button { cursor: pointer }`, leaving
+   buttons on the browser default arrow. This is the documented v4 migration
+   rule; layered, so a `cursor-*` utility on an element still wins. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
   }
 }
 
