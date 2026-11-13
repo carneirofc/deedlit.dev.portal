@@ -5,9 +5,13 @@ every service the cluster publishes, with live in-cluster health, plus an
 account page that shows who you are signed in as and why you were let in.
 Sign-in is GitHub OAuth and/or a generic OIDC issuer, both allow-listed.
 
-Deployed by `deedlit.dev.infra` at `portal.deedlit.dev`, reachable over the
-WireGuard tunnel only. **Every route requires a session** except `/login`,
+Deployed by `deedlit.dev.infra` at `portal.deedlit.dev`, public through the
+Cloudflare Tunnel (sign-in is allow-listed; nothing is anonymous). **Every route requires a session** except `/login`,
 `/api/auth/*`, `/api/health` and `/robots.txt` (`src/lib/public-paths.ts`).
+A request that arrives through Cloudflare gets a 404 on every path unless
+`PORTAL_ALLOW_PUBLIC_EDGE=true` (`src/lib/edge.ts`; the production chart sets
+it), and every request without a session counts against a per-client budget of
+120 a minute, IPv6 clients per /64.
 
 | Route                       | What it is                                                     |
 | --------------------------- | -------------------------------------------------------------- |

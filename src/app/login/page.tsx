@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { FiGithub, FiLock, FiShield } from "react-icons/fi";
 import { StatusBanner } from "@carneirofc/ui";
 import { auth, signIn, signInProviders } from "@/auth";
+import { allowsPublicEdge } from "@/lib/edge";
 import { clientKey, rateLimit, SIGN_IN_LIMIT, SIGN_IN_WINDOW_MS } from "@/lib/rate-limit";
 import { safeCallbackUrl } from "@/lib/safe-redirect";
 
@@ -136,7 +137,8 @@ export default async function LoginPage({
         </section>
 
         <p className="mt-4 text-center text-xs text-muted">
-          Reachable over the WireGuard tunnel only. Sessions end after 8 hours idle.
+          {allowsPublicEdge() ? "" : "Reachable over the WireGuard tunnel only. "}Sessions end
+          after 8 hours idle.
         </p>
       </div>
     </main>

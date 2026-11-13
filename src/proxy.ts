@@ -1,12 +1,19 @@
-import { NextResponse } from "next/server";
+import { type NextFetchEvent, type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { buildContentSecurityPolicy, createNonce } from "@/lib/csp";
+import { isRefusedEdgeRequest } from "@/lib/edge";
 import { isApiPath, isPublicPath } from "@/lib/public-paths";
+import { ANONYMOUS_LIMIT, ANONYMOUS_WINDOW_MS, clientAddress, rateLimit } from "@/lib/rate-limit";
 
 /**
  * Next 16 renamed `middleware.ts` to `proxy.ts` and moved it onto the Node
- * runtime. Two jobs here:
+ * runtime. Four jobs here, in this order:
  *
+ *  0. Refuse the public edge. A request that came through Cloudflare on a
+ *     WireGuard-only deployment gets a bare 404 before anything else runs,
+ *     static assets included (`src/lib/edge.ts`). Then an anonymous client
+ *     gets a per-address budget, so holding no session cannot buy unbounded
+ *     work (`/login` renders, Auth.js session/csrf/providers calls).
  *  1. Deny by default. Every route except the short allow-list in
  *     `src/lib/public-paths.ts` needs a session: anonymous page requests are
  *     sent to `/login`, anonymous API requests get a 401. This is the first
@@ -42,7 +49,7 @@ const SECURITY_HEADERS = {
   "X-Robots-Tag": "noindex, nofollow"
 } as const;
 
-export const proxy = auth((request) => {
+const authenticated = auth((request) => {
   const { pathname, search } = request.nextUrl;
 
   const nonce = createNonce();
@@ -55,6 +62,22 @@ export const proxy = auth((request) => {
     response.headers.set("Content-Security-Policy", csp);
     return response;
   };
+
+  if (!request.auth) {
+    const limited = rateLimit(
+      `anonymous:${clientAddress(request.headers)}`,
+      ANONYMOUS_LIMIT,
+      ANONYMOUS_WINDOW_MS
+    );
+    if (!limited.ok) {
+      return applyHeaders(
+        new NextResponse("Too many requests", {
+          status: 429,
+          headers: { "Retry-After": String(limited.retryAfter), "Cache-Control": "no-store" }
+        })
+      );
+    }
+  }
 
   if (!request.auth && !isPublicPath(pathname)) {
     if (isApiPath(pathname)) {
@@ -83,10 +106,32 @@ export const proxy = auth((request) => {
   return applyHeaders(NextResponse.next({ request: { headers: requestHeaders } }));
 });
 
+/**
+ * Hashed static bundles (client code, never data), the app icon, and the
+ * service-worker kill switch skip the session check — `public/sw.js` has to
+ * stay fetchable without a session, or a browser that installed the old worker
+ * can never replace it. They do not skip the edge check: a public route must
+ * not serve even the shell of a WireGuard-only app.
+ */
+const SESSIONLESS = /^\/(?:_next\/static\/|icon\.svg$|favicon\.ico$|sw\.js$)/;
+
+function refusedAtEdge(): NextResponse {
+  return new NextResponse("Not found", {
+    status: 404,
+    headers: { "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow" }
+  });
+}
+
+export async function proxy(request: NextRequest, event: NextFetchEvent) {
+  if (isRefusedEdgeRequest(request.headers)) return refusedAtEdge();
+  if (SESSIONLESS.test(request.nextUrl.pathname)) return NextResponse.next();
+  // Auth.js types the second argument as a route-handler context; in proxy
+  // mode it only forwards it to the callback above, which does not read it.
+  return authenticated(request, event as unknown as Parameters<typeof authenticated>[1]);
+}
+
 export const config = {
-  // Everything except hashed static bundles (client code, never data), the app
-  // icon, and the service-worker kill switch — `public/sw.js` has to stay
-  // fetchable without a session, or a browser that installed the old worker
-  // can never replace it.
-  matcher: ["/((?!_next/static/|icon\\.svg|favicon\\.ico|sw\\.js).*)"]
+  // Every path. Static bundles are matched on purpose so the edge check covers
+  // them; `SESSIONLESS` above is what spares them the session decrypt.
+  matcher: ["/:path*"]
 };
