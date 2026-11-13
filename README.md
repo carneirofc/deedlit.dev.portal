@@ -8,6 +8,9 @@ Sign-in is GitHub OAuth and/or a generic OIDC issuer, both allow-listed.
 Deployed by `deedlit.dev.infra` at `portal.deedlit.dev`, reachable over the
 WireGuard tunnel only. **Every route requires a session** except `/login`,
 `/api/auth/*`, `/api/health` and `/robots.txt` (`src/lib/public-paths.ts`).
+A request that arrives through Cloudflare gets a 404 on every path unless
+`PORTAL_ALLOW_PUBLIC_EDGE=true` (`src/lib/edge.ts`), and every request without
+a session counts against a per-client budget of 120 a minute.
 
 | Route                       | What it is                                                     |
 | --------------------------- | -------------------------------------------------------------- |

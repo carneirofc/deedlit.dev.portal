@@ -1,5 +1,6 @@
 import { isIP } from "node:net";
 import { headers } from "next/headers";
+import { allowsPublicEdge } from "@/lib/edge";
 
 /**
  * A small fixed-window rate limiter, in memory, per process.
@@ -14,7 +15,12 @@ import { headers } from "next/headers";
  *
  * Counters are bounded: expired windows are swept on write and the map is
  * capped, so the limiter itself can never become the memory-exhaustion bug it
- * is meant to prevent.
+ * is meant to prevent. At the cap the oldest window is evicted, never the new
+ * key refused: refusing turned "fill the map with junk keys" into a lockout of
+ * every legitimate client, which is a denial of service handed to whoever can
+ * vary a key. Eviction only resets a budget early for whoever has the oldest
+ * window, and someone holding 5,000 addresses is past what a per-address limit
+ * can stop anyway — that is the edge's job, not this map's.
  */
 
 const MAX_TRACKED_KEYS = 5_000;
@@ -47,10 +53,14 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   const existing = windows.get(key);
 
   if (!existing || existing.resetAt <= now) {
+    if (existing) windows.delete(key);
     if (windows.size >= MAX_TRACKED_KEYS) sweep(now);
-    // Still full of live windows: refuse rather than grow without bound. This
-    // only bites under a distributed flood, where refusing is the right answer.
-    if (windows.size >= MAX_TRACKED_KEYS) return { ok: false, retryAfter: 60 };
+    // Still full of live windows: drop the oldest. Map iteration is insertion
+    // order, and re-inserting on every new window keeps that order meaningful.
+    if (windows.size >= MAX_TRACKED_KEYS) {
+      const oldest = windows.keys().next().value;
+      if (oldest !== undefined) windows.delete(oldest);
+    }
 
     windows.set(key, { count: 1, resetAt: now + windowMs });
     return { ok: true, retryAfter: 0 };
@@ -76,6 +86,16 @@ export const SIGN_IN_LIMIT = 10;
 export const SIGN_IN_WINDOW_MS = 60_000;
 
 /**
+ * Every request without a session, whatever the path: the `/login` render,
+ * `/api/auth/session|csrf|providers` (which Auth.js leaves unlimited), redirects
+ * to `/login`, 401s. Each is cheap alone; this caps what one client can make
+ * the process do while holding nothing. A browser loading `/login` makes a
+ * handful of these, so 120 a minute is far from any human pattern.
+ */
+export const ANONYMOUS_LIMIT = 120;
+export const ANONYMOUS_WINDOW_MS = 60_000;
+
+/**
  * The client address a request with no session is counted against.
  *
  * Public traffic arrives Cloudflare → cloudflared (tunnel) → Traefik → here,
@@ -86,22 +106,25 @@ export const SIGN_IN_WINDOW_MS = 60_000;
  *
  * Cloudflare's edge sets `CF-Connecting-IP` to the real client and overwrites
  * any client-supplied value, so on the tunnel path it is the only per-client
- * signal there is, and it is preferred when it holds an IP literal.
+ * signal there is.
  *
- * The trade-off, stated plainly: a client that reaches Traefik *directly* (the
- * LAN LoadBalancer, for non-public Ingresses) can set `CF-Connecting-IP` itself
- * and rotate it to escape its bucket. That lets someone already on the trusted
- * LAN bypass a limit — far better than letting anyone on the internet deny
- * sign-in to everyone. Closing it needs Traefik to strip the header for
- * non-tunnel peers (a tunnel-only entrypoint); see the infra repo.
+ * It is read **only** when this deployment is public on purpose
+ * (`PORTAL_ALLOW_PUBLIC_EDGE`, see `src/lib/edge.ts`). On a WireGuard-only
+ * deployment every request that carries the header has already been refused
+ * by the proxy, and any that reach here wrote it themselves: honouring it would
+ * let a client rotate it to escape its bucket, or spray it to flood the map.
+ * Even on a public deployment a client that reaches Traefik directly can still
+ * forge it; closing that needs a tunnel-only Traefik entrypoint (infra repo).
  *
  * Without the header, the **last** `X-Forwarded-For` entry is used: Traefik
  * appends its real peer, and every entry before it is client-written. With
  * neither header everything shares one bucket — noisy, but never bypassable.
  */
 export function clientAddress(requestHeaders: Headers): string {
-  const cloudflare = requestHeaders.get("cf-connecting-ip")?.trim();
-  if (cloudflare && isIP(cloudflare)) return `cf:${cloudflare}`;
+  if (allowsPublicEdge()) {
+    const cloudflare = requestHeaders.get("cf-connecting-ip")?.trim();
+    if (cloudflare && isIP(cloudflare)) return `cf:${cloudflare}`;
+  }
 
   const forwarded = requestHeaders.get("x-forwarded-for");
   const entries = forwarded?.split(",").map((entry) => entry.trim()).filter(Boolean) ?? [];
