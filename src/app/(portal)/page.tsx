@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { refreshServices } from "@/app/actions";
-import { PortalGuide } from "@/features/services/components/PortalGuide";
 import { ServicesBoard } from "@/features/services/components/ServicesBoard";
 import { ServiceSummary } from "@/features/services/components/ServiceSummary";
 import { summarize } from "@/features/services/lib/summary";
@@ -63,8 +62,6 @@ export default async function ServicesPage() {
       <Suspense fallback={<ServicesSkeleton />}>
         <Services />
       </Suspense>
-
-      <PortalGuide />
     </main>
   );
 }
