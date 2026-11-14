@@ -18,7 +18,6 @@ button and the "checked N s ago" freshness labels.
 | `components/ServiceCard.tsx`  | One service: status, host, namespace, probe, copy buttons |
 | `components/ServiceLinks.tsx` | A card's extra addresses (`portal.deedlit.dev/links`)     |
 | `components/StatusPill.tsx`   | Up / down / unknown pill                                  |
-| `components/PortalGuide.tsx`  | The collapsible "How this page works" explainer           |
 | `components/RefreshButton.tsx` | Refresh with pending state and rate-limit feedback       |
 | `components/ServiceGlyph.tsx` | Icon lookup, with a `generic` fallback                    |
 | `data/local-services.ts`      | Development fallback when there is no cluster             |

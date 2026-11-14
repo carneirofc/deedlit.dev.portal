@@ -164,7 +164,7 @@ export function ServicesBoard({
         <div className="rounded-xl border border-dashed border-line/80 p-6 text-sm text-muted">
           No services are advertising themselves to the portal. An Ingress needs the label{" "}
           <code className="font-[var(--font-mono)] text-xs">app.deedlit.dev/expose=true</code> to
-          appear here — see “How this page works” below.
+          appear here.
         </div>
       )}
 
